@@ -96,16 +96,22 @@ class _BackgroundServiceScreenState extends State<BackgroundServiceScreen> {
       final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
           FlutterLocalNotificationsPlugin();
 
-      // var a = await obd2.getParamsFromJSON(params);
-
-      // obd2.setOnDataReceived((command, response, requestCode) {
-      //   print("$command => $response");
-      // });
+      await obd2.getParamsFromJSON(params);
+    var a;
+    try{
+      obd2.setOnDataReceived((command, response, requestCode) {
+        print("$command => $response");
+        a = response;
+      });
+    }
+    catch (e){
+      a = 'problem';
+    }
 
       flutterLocalNotificationsPlugin.show(
         notificationId,
-        'COOL SERVICE',
-        'Awesome ${DateTime.now()}',
+        a,
+        '${DateTime.now()}',
         const NotificationDetails(
           android: AndroidNotificationDetails(
             notificationChannelId,
