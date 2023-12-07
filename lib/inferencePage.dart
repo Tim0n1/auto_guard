@@ -12,6 +12,8 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 //import 'package:flatur/obd2.dart';
 
+Obd2Plugin obd2 = Obd2Plugin();
+
 class BackgroundServiceScreen extends StatefulWidget {
   final BluetoothDevice? connectedDevice;
 
@@ -27,8 +29,6 @@ class _BackgroundServiceScreenState extends State<BackgroundServiceScreen> {
   //String jsonParamsPath = 'lib\\params.json';
   String params = StringJson().params;
 
-  Obd2Plugin obd2 = Obd2Plugin();
-
   FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final service = FlutterBackgroundService();
@@ -42,12 +42,11 @@ class _BackgroundServiceScreenState extends State<BackgroundServiceScreen> {
   @override
   void initState() {
     super.initState();
-    // obd2.getConnection(widget.connectedDevice!, (connection) {
-    //   print("connected to bluetooth device.");
-    // }, (message) {
-    //   print("error in connecting: $message");
-    // });
-    //print(invokePlatformCode());
+    obd2.getConnection(widget.connectedDevice!, (connection) {
+      print("connected to bluetooth device.");
+    }, (message) {
+      print("error in connecting: $message");
+    });
     initializeService();
 
     print(11);
@@ -89,28 +88,35 @@ class _BackgroundServiceScreenState extends State<BackgroundServiceScreen> {
     service.on('stopService').listen((event) {
       service.stopSelf();
     });
-    Obd2Plugin obd2 = Obd2Plugin();
+    service.on('startService').listen((event) {
+      print(164654645);
+      print(event?.entries);
+    });
+
     String params = StringJson().params;
 
     Timer.periodic(Duration(seconds: 3), (timer) async {
       final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
           FlutterLocalNotificationsPlugin();
 
-      await obd2.getParamsFromJSON(params);
-    var a;
-    try{
-      obd2.setOnDataReceived((command, response, requestCode) {
-        print("$command => $response");
-        a = response;
-      });
-    }
-    catch (e){
-      a = 'problem';
-    }
+      if (!(await obd2.hasConnection)) {
+        await obd2.disconnect();
+        print('no active connection');
+      } else {
+        if (!(await obd2.isListenToDataInitialed)) {
+          obd2.setOnDataReceived((command, response, requestCode) {
+            print("$command => $response");
+          });
+        }
+        await Future.delayed(Duration(
+            milliseconds: await obd2.configObdWithJSON(StringJson().config)));
+        await Future.delayed(Duration(
+            milliseconds: await obd2.getParamsFromJSON(StringJson().params)));
+      }
 
       flutterLocalNotificationsPlugin.show(
         notificationId,
-        a,
+        'S',
         '${DateTime.now()}',
         const NotificationDetails(
           android: AndroidNotificationDetails(
@@ -134,6 +140,8 @@ class _BackgroundServiceScreenState extends State<BackgroundServiceScreen> {
     } else {
       //initializeService();
       service.startService();
+      obd2.disconnect();
+      Map<String, dynamic> args = {'obd2_instance': obd2};
       service.invoke('startService');
 
       setState(() {
