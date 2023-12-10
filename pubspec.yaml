@@ -34,6 +34,8 @@ dependencies:
   permission_handler: ^10.2.0
   obd2_plugin:
     path: obd2_plugin/
+  location: ^5.0.0
+  flutter_background: ^1.2.0
 
 
 

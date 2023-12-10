@@ -3,6 +3,9 @@
 import 'package:flutter/material.dart';
 
 class LiveDataPage extends StatefulWidget {
+  final Stream<void>? stream;
+  const LiveDataPage({required this.stream});
+
   @override
   _LiveDataPageState createState() => _LiveDataPageState();
 }

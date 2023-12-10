@@ -5,7 +5,7 @@ class StringJson {
     {
         "PID": "AT RV",
         "length": 4,
-        "title": "ولتاژ باطری",
+        "title": "Напрежение на акумулатора",
         "unit": "V",
         "description": "<str>",
         "status": true
@@ -13,7 +13,7 @@ class StringJson {
     {
         "PID": "01 0C",
         "length": 2,
-        "title": "دور موتور",
+        "title": "Обороти",
         "unit": "RPM",
         "description": "<double>, (( [0] * 256) + [1] ) / 4",
         "status": true
@@ -21,7 +21,7 @@ class StringJson {
     {
         "PID": "01 0D",
         "length": 1,
-        "title": "سرعت خودرو",
+        "title": "Скорост на автомобила",
         "unit": "Kh",
         "description": "<int>, [0]",
         "status": true
@@ -29,7 +29,7 @@ class StringJson {
     {
         "PID": "01 05",
         "length": 1,
-        "title": "دمای موتور",
+        "title": "Температура на двигателя",
         "unit": "°C",
         "description": "<int>, [0] - 40",
         "status": true
@@ -37,7 +37,7 @@ class StringJson {
     {
         "PID": "01 0B",
         "length": 1,
-        "title": "فشار مطلق منیفولد",
+        "title": "Абсолютно налягане в колектора",
         "unit": "kPa",
         "description": "<int>, [0]",
         "status": true
