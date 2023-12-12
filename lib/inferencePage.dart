@@ -18,10 +18,10 @@ import 'package:location/location.dart';
 
 class BackgroundServiceScreen extends StatefulWidget {
   final BluetoothDevice? connectedDevice;
-  final StreamSubscription<void>? subscription;
+  final Stream<void>? stream;
 
   const BackgroundServiceScreen(
-      {required this.connectedDevice, required this.subscription});
+      {required this.connectedDevice, this.stream});
 
   @override
   _BackgroundServiceScreenState createState() =>
@@ -71,8 +71,6 @@ class _BackgroundServiceScreenState extends State<BackgroundServiceScreen> {
         _serviceRunning1 = false;
       });
     } else {
-      widget.subscription?.cancel();
-      print(widget.subscription?.isPaused);
       setState(() {
         _serviceRunning1 = true;
       });

@@ -1,35 +1,70 @@
 // ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables, library_private_types_in_public_api
 
+import 'dart:async';
+import 'dart:convert';
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
 
 class LiveDataPage extends StatefulWidget {
-  final Stream<void>? stream;
-  const LiveDataPage({required this.stream});
+  final Stream? stream;
+  final StreamController? controller;
+  const LiveDataPage({this.stream, required this.controller});
 
   @override
   _LiveDataPageState createState() => _LiveDataPageState();
 }
 
 class _LiveDataPageState extends State<LiveDataPage> {
-  List<Map<String, dynamic>> data = [
-    {'parameter': 'O2%', 'value': '23.5'},
-    {'parameter': 'Voltage', 'value': '12.3V'},
-    {'parameter': 'Temperature', 'value': '78°C'},
-    {'parameter': 'Emissions', 'value': 'Low'},
-    // Add more parameters and values as needed
-  ];
+  List<Map<String, dynamic>> data = [];
+  StreamSubscription<dynamic>? _streamSubscription;
 
-  void updateData() {
-    // Simulating data update (replace this with your data update logic)
+  @override
+  void initState() {
+    super.initState();
+    // if (widget.controller!.isClosed){
+    //   widget.controller.
+    // }
+    StreamSubscription<dynamic> _streamSubscription =
+        widget.controller!.stream.listen(
+      (event) {
+        updateData(event);
+        print("received data: $event");
+      },
+      onError: (dynamic error) {
+        // Handle errors, if any
+        print('Error occurred: $error');
+      },
+      onDone: () {
+        // Handle when the stream is done (closed)
+        print('StreamController closed');
+      },
+    );
+    // Start a periodic timer to update data every 2 seconds
+    //Timer.periodic(Duration(seconds: 2), (timer) {
+    //updateData(); // Update the data
+  }
+
+  void updateData(String event) async {
+    data = [];
+    List<dynamic> parsedJson = [];
+    parsedJson = json.decode(event);
     setState(() {
-      data = [
-        {'parameter': 'O2%', 'value': '24.0'},
-        {'parameter': 'Voltage', 'value': '12.8V'},
-        {'parameter': 'Temperature', 'value': '80°C'},
-        {'parameter': 'Emissions', 'value': 'Normal'},
-        // Update other parameters and values as needed
-      ];
+      for (int i = 0; i < parsedJson.length-1; i++) {
+        data.insert(i, {
+          'parameter': parsedJson[i]['title'],
+          'value': "${parsedJson[i]['response']} ${parsedJson[i]['unit']}"
+        });
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _streamSubscription?.cancel();
+    widget.controller!
+        .close(); // Close the StreamController when disposing the widget
+    super.dispose();
   }
 
   @override
@@ -66,7 +101,7 @@ class _LiveDataPageState extends State<LiveDataPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // Call updateData() to simulate data changes
-          updateData();
+          //updateData();
         },
         child: Icon(Icons.refresh),
       ),

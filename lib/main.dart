@@ -1,4 +1,6 @@
-// ignore_for_file: prefer_const_constructors
+// ignore_for_file: prefer_const_constructors, non_constant_identifier_names
+
+import 'dart:convert';
 
 import 'package:flatur/inferencePage.dart';
 import 'package:flatur/liveDataPage.dart';
@@ -51,10 +53,13 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   bool _bluetoothPermissionGranted = false;
   bool _notificationsPermissionsGranted = false;
   bool _serviceRunning = true;
+  bool _isDeviceCompatible = false;
+  bool _isDeviceCompatibleButtonEnabled = true;
+  String vinNumber = '';
   Obd2Plugin obd2 = Obd2Plugin();
 
-  Stream<void>? _stream;
-  StreamController<void> _eventController = StreamController<void>.broadcast();
+  //Stream<void>? _stream;
+  StreamController _eventController = StreamController.broadcast();
 
   late Timer _deviceRefreshTimer;
   static const int _refreshInterval = 3; // Refresh interval in seconds
@@ -75,7 +80,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     super.initState();
     _initBluetooth();
     _startDeviceRefreshTimer();
-    _stream = startParamsExtraction().asStream();
+    startParamsExtraction();
   }
 
   @override
@@ -87,9 +92,8 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
   Future<void> startParamsExtraction() async {
     while (true) {
-      print('thread running');
-      await Future.delayed(Duration(seconds: 3));
-      print(_serviceRunning);
+      await Future.delayed(Duration(milliseconds: 500));
+      //print(_serviceRunning);
       if (!_serviceRunning) {
         print("service not running");
         return;
@@ -98,39 +102,55 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
       DartPluginRegistrant.ensureInitialized();
 
       if (_connectedDevice != null) {
-        obd2.getConnection(_connectedDevice!,
-            (connection) => null, (message) => null);
+        String response = '';
+        if (!await obd2.hasConnection) {
+          obd2.getConnection(
+              _connectedDevice!, (connection) => null, (message) => null);
+        } else {
+          final FlutterLocalNotificationsPlugin
+              flutterLocalNotificationsPlugin =
+              FlutterLocalNotificationsPlugin();
 
-        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-            FlutterLocalNotificationsPlugin();
+          if (await obd2.hasConnection) {
+            print('obd has connection');
+            if (!(await obd2.isListenToDataInitialed)) {
+              obd2.setOnDataReceived((command, response, requestCode) {
+                if (!_eventController.isClosed) {
+                  _eventController.add(response);
+                } else {
+                  print("startirame");
+                  _eventController = StreamController.broadcast();
+                }
+                List<dynamic> parsedJson = [];
+                parsedJson = json.decode(response);
+                vinNumber = parsedJson[parsedJson.length - 1]['response'];
 
-        if (await obd2.hasConnection) {
-          print('obd has connection');
-          if (!(await obd2.isListenToDataInitialed)) {
-            obd2.setOnDataReceived((command, response, requestCode) {
-              //_eventController.add(response);
-              print("$command => $response");
-            });
-          }
-          // await Future.delayed(Duration(
-          //     milliseconds: await obd2.configObdWithJSON(StringJson().config)));
-          await Future.delayed(Duration(
-              milliseconds: await obd2.getParamsFromJSON(StringJson().params)));
+                print("$command => $response");
+              });
+            }
+            // await Future.delayed(Duration(
+            //     milliseconds: await obd2.configObdWithJSON(StringJson().config)));
+            int delay = await obd2.getParamsFromJSON(StringJson().params);
+            print(delay);
+            await Future.delayed(Duration(milliseconds: delay));
+            // List<dynamic> parsedJson = [];
+            // parsedJson = json.decode(response);
+            // print("vin number $vinNumber");
 
-          flutterLocalNotificationsPlugin.show(
-            notificationId,
-            'S',
-            '${DateTime.now()}',
-            const NotificationDetails(
-              android: AndroidNotificationDetails(
-                notificationChannelId,
-                'MY FOREGROUND SERVICE',
-                icon: 'ic_bg_service_small',
-                ongoing: false,
+            flutterLocalNotificationsPlugin.show(
+              notificationId,
+              'S',
+              '${DateTime.now()}',
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  notificationChannelId,
+                  'MY FOREGROUND SERVICE',
+                  icon: 'ic_bg_service_small',
+                  ongoing: false,
+                ),
               ),
-            ),
-          );
-          print('backgrounda cuka');
+            );
+          }
         }
       } else {
         print('no connected device');
@@ -305,9 +325,8 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
                               context,
                               MaterialPageRoute(
                                   builder: (context) => BackgroundServiceScreen(
-                                      connectedDevice: _connectedDevice,
-                                      subscription:
-                                          _stream?.listen((event) {}))));
+                                        connectedDevice: _connectedDevice,
+                                      )));
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -340,8 +359,9 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) =>
-                                LiveDataPage(stream: _stream)));
+                            builder: (context) => LiveDataPage(
+                                  controller: _eventController,
+                                )));
                   },
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(
@@ -417,23 +437,26 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
                 SizedBox(
                     width: 8), // Add some space between the button and text
                 FloatingActionButton(
-                  onPressed: checkObdButton
-                  // Add your action when the button is pressed here
-                  ,
-                  foregroundColor: null,
+                  onPressed:
+                      _isDeviceCompatibleButtonEnabled ? checkObdButton : null,
                   backgroundColor: Colors.transparent,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: checkObdButton,
-                      child: Image.asset(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.asset(
                         'lib/images/obd_icon.png', // Replace with your icon asset path
                         // Adjust height as needed
                         // You can also use other properties available in Image.asset
                       ),
-                    ),
+                      if (!_isDeviceCompatibleButtonEnabled)
+                        CircularProgressIndicator(
+                          strokeAlign: BorderSide.strokeAlignOutside,
+                          strokeWidth: 3,
+                          color: Colors.white,
+                        ), // Show loading indicator when isLoading is true
+                    ],
                   ),
-                ),
+                )
               ],
             ),
           ],
@@ -442,10 +465,26 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     );
   }
 
-  void checkObdButton() {
+  Future<void> checkObdButton() async {
     setState(() {
-      _serviceRunning = false;
-      print(_serviceRunning);
+      _isDeviceCompatibleButtonEnabled = false;
+    });
+    if (vinNumber.length > 17) {
+      if (await obd2.isListenToDataInitialed) {
+        await Future.delayed(Duration(milliseconds: 1000));
+        vinNumber = vinNumber.substring(13);
+        print(vinNumber);
+        vinNumber = decodeHexASCII2(vinNumber);
+        print(vinNumber);
+      }
+    }
+    setState(() {
+      _isDeviceCompatibleButtonEnabled = true;
     });
   }
+
+  // setState(() {
+  //   _serviceRunning = false;
+  //   print(_serviceRunning);
+  // });
 }

@@ -1,6 +1,54 @@
 import 'package:obd2_plugin/obd2_plugin.dart';
 
+String decodeHexASCII(String encoded) {
+  List<String> hexValues = encoded.split(' ');
+  List<int> decimalValues =
+      hexValues.map((hex) => int.parse(hex, radix: 16)).toList();
+  String decodedString = String.fromCharCodes(decimalValues);
+  return decodedString;
+}
+
+String decodeHexASCII2(String encoded) {
+  List<String> parts = encoded.split(' '); // Split the string by spaces
+
+  String decodedString = '';
+
+  for (String part in parts) {
+    try {
+      if (part.isNotEmpty) {
+        if (part.length % 2 == 0) {
+          // If the part has an even length
+          List<int> bytes = [];
+
+          for (int i = 0; i < part.length; i += 2) {
+            String hex = part.substring(i, i + 2);
+            bytes.add(int.parse(hex, radix: 16));
+          }
+
+          decodedString +=
+              String.fromCharCodes(bytes); // Convert bytes to characters
+        } else {
+          decodedString += part; // Append non-hex parts directly
+        }
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  return decodedString;
+}
+
 class StringJson {
+  String checkObd = '''[
+    {
+      "PID": "09 02",
+      "length": 17,
+      "title": "ECU name",
+      "description": "<str>",
+      "status": true
+    }
+  ]''';
   String params = '''[
     {
         "PID": "AT RV",
@@ -41,6 +89,13 @@ class StringJson {
         "unit": "kPa",
         "description": "<int>, [0]",
         "status": true
+    },
+    {
+      "PID": "09 02",
+      "length": 17,
+      "title": "VIN number",
+      "description": "<str>",
+      "status": true
     }
 ]''';
 
