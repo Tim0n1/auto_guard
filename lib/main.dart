@@ -1,7 +1,7 @@
 // ignore_for_file: prefer_const_constructors, non_constant_identifier_names
 
 import 'dart:convert';
-
+import 'package:vin_decoder/vin_decoder.dart';
 import 'package:flatur/inferencePage.dart';
 import 'package:flatur/liveDataPage.dart';
 import 'package:flutter/material.dart';
@@ -53,8 +53,9 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   bool _bluetoothPermissionGranted = false;
   bool _notificationsPermissionsGranted = false;
   bool _serviceRunning = true;
-  bool _isDeviceCompatible = false;
+  bool _isDeviceCompatible = true;
   bool _isDeviceCompatibleButtonEnabled = true;
+  Map<String, String?> carInformation = {"manufacturer": null, "model": null};
   String vinNumber = '';
   Obd2Plugin obd2 = Obd2Plugin();
 
@@ -92,7 +93,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
   Future<void> startParamsExtraction() async {
     while (true) {
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(Duration(milliseconds: 1000));
       //print(_serviceRunning);
       if (!_serviceRunning) {
         print("service not running");
@@ -128,11 +129,10 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
                 print("$command => $response");
               });
             }
-            // await Future.delayed(Duration(
-            //     milliseconds: await obd2.configObdWithJSON(StringJson().config)));
-            int delay = await obd2.getParamsFromJSON(StringJson().params);
-            print(delay);
-            await Future.delayed(Duration(milliseconds: delay));
+
+            await Future.delayed(Duration(
+                milliseconds:
+                    await obd2.getParamsFromJSON(StringJson().params)));
             // List<dynamic> parsedJson = [];
             // parsedJson = json.decode(response);
             // print("vin number $vinNumber");
@@ -269,7 +269,9 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   void _startDeviceRefreshTimer() {
     _deviceRefreshTimer =
         Timer.periodic(Duration(seconds: _refreshInterval), (timer) {
-      _updateConnectedDevice(); // Update connected device status
+      if (_bluetoothPermissionGranted && _notificationsPermissionsGranted) {
+        _updateConnectedDevice();
+      } // Update connected device status
     });
   }
 
@@ -425,7 +427,11 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    'Check OBD\n compatibility',
+                    !_isDeviceCompatible
+                        ? "Device is not compatible"
+                        : carInformation['manufacturer'] == null
+                            ? 'Check OBD\n compatibility'
+                            : "${carInformation['manufacturer']}\n${carInformation['model']}",
                     textAlign: TextAlign.end,
                     style: TextStyle(
                       fontSize: 14,
@@ -471,12 +477,28 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
     });
     if (vinNumber.length > 17) {
       if (await obd2.isListenToDataInitialed) {
-        await Future.delayed(Duration(milliseconds: 1000));
-        vinNumber = vinNumber.substring(13);
+        await Future.delayed(Duration(milliseconds: 1500));
+        vinNumber = vinNumber.substring(19);
         print(vinNumber);
         vinNumber = decodeHexASCII2(vinNumber);
+        print(vinNumber.length);
         print(vinNumber);
+        var vin = VIN(number: vinNumber, extended: true);
+        print(vinNumber);
+        String? model = await vin.getModelAsync();
+        print(model);
+        print(vin.getManufacturer());
+        print(vinNumber);
+        setState(() {
+          _isDeviceCompatible = true;
+          carInformation['manufacturer'] = vin.getManufacturer();
+          carInformation['model'] = model;
+        });
       }
+    } else {
+      setState(() {
+        _isDeviceCompatible = false;
+      });
     }
     setState(() {
       _isDeviceCompatibleButtonEnabled = true;

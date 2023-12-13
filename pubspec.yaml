@@ -36,6 +36,7 @@ dependencies:
     path: obd2_plugin/
   location: ^5.0.0
   flutter_background: ^1.2.0
+  vin_decoder: 0.2.1-nullsafety
 
 
 
