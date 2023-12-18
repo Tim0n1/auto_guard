@@ -100,6 +100,20 @@ class StringJson {
 ]''';
 
   String config = '''[
+    {
+      "command": "AT Z",
+                "description": "",
+                "status": true
+    },
+    {
+      "command": "AT SP 0",
+      "description": "",
+      "status": true
+    }
+
+  ]''';
+
+  String fullConfig = '''[
             {
                 "command": "AT Z",
                 "description": "",

@@ -14,6 +14,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:ui';
+import 'settingsScreen.dart';
 import 'obd2.dart';
 
 String currentVersion = 'v0.1';
@@ -29,6 +30,13 @@ class MyApp extends StatelessWidget {
       title: 'Demo',
       theme: ThemeData(
         primaryColor: Colors.pink,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: <TargetPlatform, PageTransitionsBuilder>{
+            TargetPlatform.android: ZoomPageTransitionsBuilder(
+              allowEnterRouteSnapshotting: false,
+            ),
+          },
+        ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             shape: RoundedRectangleBorder(
@@ -47,11 +55,16 @@ class BluetoothScreen extends StatefulWidget {
   _BluetoothScreenState createState() => _BluetoothScreenState();
 }
 
-class _BluetoothScreenState extends State<BluetoothScreen> {
+class _BluetoothScreenState extends State<BluetoothScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
   BluetoothDevice? _connectedDevice;
   bool _bluetoothPermissionGranted = false;
   bool _notificationsPermissionsGranted = false;
+
   bool _serviceRunning = true;
   bool _isDeviceCompatible = true;
   bool _isDeviceCompatibleButtonEnabled = true;
@@ -92,6 +105,8 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
   }
 
   Future<void> startParamsExtraction() async {
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
     while (true) {
       await Future.delayed(Duration(milliseconds: 1000));
       //print(_serviceRunning);
@@ -108,11 +123,11 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
           obd2.getConnection(
               _connectedDevice!, (connection) => null, (message) => null);
         } else {
-          final FlutterLocalNotificationsPlugin
-              flutterLocalNotificationsPlugin =
-              FlutterLocalNotificationsPlugin();
+          await Future.delayed(Duration(
+                milliseconds:
+                    await obd2.configObdWithJSON(StringJson().config)));
 
-          if (await obd2.hasConnection) {
+          
             print('obd has connection');
             if (!(await obd2.isListenToDataInitialed)) {
               obd2.setOnDataReceived((command, response, requestCode) {
@@ -125,34 +140,34 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
                 List<dynamic> parsedJson = [];
                 parsedJson = json.decode(response);
                 vinNumber = parsedJson[parsedJson.length - 1]['response'];
+                flutterLocalNotificationsPlugin.show(
+                notificationId,
+                'S',
+                '${DateTime.now()}',
+                const NotificationDetails(
+                  android: AndroidNotificationDetails(
+                    notificationChannelId,
+                    'MY FOREGROUND SERVICE',
+                    icon: 'ic_bg_service_small',
+                    ongoing: false,
+                  ),
+                ),
+              );
 
                 print("$command => $response");
               });
             }
-
-            await Future.delayed(Duration(
-                milliseconds:
-                    await obd2.getParamsFromJSON(StringJson().params)));
-            // List<dynamic> parsedJson = [];
-            // parsedJson = json.decode(response);
-            // print("vin number $vinNumber");
-
-            flutterLocalNotificationsPlugin.show(
-              notificationId,
-              'S',
-              '${DateTime.now()}',
-              const NotificationDetails(
-                android: AndroidNotificationDetails(
-                  notificationChannelId,
-                  'MY FOREGROUND SERVICE',
-                  icon: 'ic_bg_service_small',
-                  ongoing: false,
-                ),
-              ),
-            );
+            while (await obd2.hasConnection && _connectedDevice!=null) {
+              await Future.delayed(Duration(
+                  milliseconds:
+                      await obd2.getParamsFromJSON(StringJson().params)));
+              // List<dynamic> parsedJson = [];
+              // parsedJson = json.decode(response);
+              // print("vin number $vinNumber");
+            }
           }
         }
-      } else {
+       else {
         print('no connected device');
       }
     }
@@ -277,9 +292,23 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       appBar: AppBar(
         title: Text('Car Doctor $currentVersion'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings),
+            onPressed: () {
+              // Add functionality for the settings button here
+              // For example, navigate to settings screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SettingsPage()),
+              );
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -428,7 +457,7 @@ class _BluetoothScreenState extends State<BluetoothScreen> {
                 Expanded(
                   child: Text(
                     !_isDeviceCompatible
-                        ? "Device is not compatible"
+                        ? "Device is not\n compatible"
                         : carInformation['manufacturer'] == null
                             ? 'Check OBD\n compatibility'
                             : "${carInformation['manufacturer']}\n${carInformation['model']}",
