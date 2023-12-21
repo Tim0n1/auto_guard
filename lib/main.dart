@@ -16,10 +16,32 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:ui';
 import 'settingsScreen.dart';
 import 'obd2.dart';
+import 'package:postgres/postgres.dart';
+import 'DB.dart';
 
 String currentVersion = 'v0.1';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Retrieve the SharedPreferences instance
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // Check if the app is opened for the first time
+  bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
+
+  // If it's the first time, generate and save the ID
+  if (isFirstTime) {
+    // Generate an ID (for example, a random integer)
+    int generatedId = DateTime.now().millisecondsSinceEpoch % 1000000;
+
+    // Save the ID to SharedPreferences
+    prefs.setInt('generatedId', generatedId);
+
+    // Set isFirstTime to false to indicate that it's not the first time anymore
+    prefs.setBool('isFirstTime', false);
+  }
+
   runApp(MyApp());
 }
 
@@ -60,10 +82,14 @@ class _BluetoothScreenState extends State<BluetoothScreen>
   @override
   bool get wantKeepAlive => true;
 
+  int? id;
+
   BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
   BluetoothDevice? _connectedDevice;
   bool _bluetoothPermissionGranted = false;
   bool _notificationsPermissionsGranted = false;
+
+  PostgresService postgresService = PostgresService();
 
   bool _serviceRunning = true;
   bool _isDeviceCompatible = true;
@@ -104,7 +130,16 @@ class _BluetoothScreenState extends State<BluetoothScreen>
     super.dispose();
   }
 
+  Future<int?> getId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int? id = prefs.getInt('generatedId');
+    return id;
+  }
+
   Future<void> startParamsExtraction() async {
+    Connection? _conn = await postgresService.getConnection();
+    int? id = await getId();
+    await postgresService.addUser(id);
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
     while (true) {
@@ -124,23 +159,23 @@ class _BluetoothScreenState extends State<BluetoothScreen>
               _connectedDevice!, (connection) => null, (message) => null);
         } else {
           await Future.delayed(Duration(
-                milliseconds:
-                    await obd2.configObdWithJSON(StringJson().config)));
+              milliseconds: await obd2.configObdWithJSON(StringJson().config)));
 
-          
-            print('obd has connection');
-            if (!(await obd2.isListenToDataInitialed)) {
-              obd2.setOnDataReceived((command, response, requestCode) {
-                if (!_eventController.isClosed) {
-                  _eventController.add(response);
-                } else {
-                  print("startirame");
-                  _eventController = StreamController.broadcast();
-                }
-                List<dynamic> parsedJson = [];
-                parsedJson = json.decode(response);
-                vinNumber = parsedJson[parsedJson.length - 1]['response'];
-                flutterLocalNotificationsPlugin.show(
+          print('obd has connection');
+          if (!(await obd2.isListenToDataInitialed)) {
+            obd2.setOnDataReceived((command, response, requestCode) {
+              if (!_eventController.isClosed) {
+                _eventController.add(response);
+              } else {
+                print("startirame");
+                _eventController = StreamController.broadcast();
+              }
+              List<dynamic> parsedJson = [];
+              parsedJson = json.decode(response);
+              vinNumber = parsedJson[parsedJson.length - 1]['response'];
+              postgresService.insert(parsedJson.sublist(1, 4));
+
+              flutterLocalNotificationsPlugin.show(
                 notificationId,
                 'S',
                 '${DateTime.now()}',
@@ -154,20 +189,19 @@ class _BluetoothScreenState extends State<BluetoothScreen>
                 ),
               );
 
-                print("$command => $response");
-              });
-            }
-            while (await obd2.hasConnection && _connectedDevice!=null) {
-              await Future.delayed(Duration(
-                  milliseconds:
-                      await obd2.getParamsFromJSON(StringJson().params)));
-              // List<dynamic> parsedJson = [];
-              // parsedJson = json.decode(response);
-              // print("vin number $vinNumber");
-            }
+              print("$command => $response");
+            });
+          }
+          while (await obd2.hasConnection && _connectedDevice != null) {
+            await Future.delayed(Duration(
+                milliseconds:
+                    await obd2.getParamsFromJSON(StringJson().params)));
+            // List<dynamic> parsedJson = [];
+            // parsedJson = json.decode(response);
+            // print("vin number $vinNumber");
           }
         }
-       else {
+      } else {
         print('no connected device');
       }
     }
