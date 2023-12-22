@@ -13,6 +13,7 @@ import 'package:flatur/trainingPage.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:ui';
 import 'settingsScreen.dart';
 import 'obd2.dart';
@@ -84,6 +85,9 @@ class _BluetoothScreenState extends State<BluetoothScreen>
 
   int? id;
 
+  bool _isInternetEnabled = false;
+  bool _isDatabaseConnected = false;
+
   BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
   BluetoothDevice? _connectedDevice;
   bool _bluetoothPermissionGranted = false;
@@ -104,6 +108,8 @@ class _BluetoothScreenState extends State<BluetoothScreen>
   late Timer _deviceRefreshTimer;
   static const int _refreshInterval = 3; // Refresh interval in seconds
 
+  int _currentIndex = 0;
+
   Timer? _timer;
   FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -116,6 +122,7 @@ class _BluetoothScreenState extends State<BluetoothScreen>
 
   @override
   void initState() {
+    _initInternetConnection();
     print(111111);
     super.initState();
     _initBluetooth();
@@ -173,8 +180,11 @@ class _BluetoothScreenState extends State<BluetoothScreen>
               List<dynamic> parsedJson = [];
               parsedJson = json.decode(response);
               vinNumber = parsedJson[parsedJson.length - 1]['response'];
-              postgresService.insert(parsedJson.sublist(1, 4));
-
+              if (_conn != null) {
+                postgresService.insert(parsedJson.sublist(1, 4));
+              } else {
+                print('no DB connection');
+              }
               flutterLocalNotificationsPlugin.show(
                 notificationId,
                 'S',
@@ -218,6 +228,31 @@ class _BluetoothScreenState extends State<BluetoothScreen>
       return false;
     }
   }
+
+  void _initInternetConnection() async {
+    InternetConnectionChecker().onStatusChange.listen((status) {
+      setState(() {
+        _isInternetEnabled = status == InternetConnectionStatus.connected;
+      });
+      if (!_isInternetEnabled) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('No Internet Connection'),
+            content: Text('Please check your internet connection.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
+  }
+
+  void _checkDBconnection() async {}
 
   Future<void> _checkBluetoothPermission() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -531,6 +566,32 @@ class _BluetoothScreenState extends State<BluetoothScreen>
           ],
         ),
       ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (int index) {
+          setState(() {
+            _currentIndex = index; // Update the selected tab index
+          });
+        },
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_graph_sharp),
+            label: 'Live data',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.warning),
+            label: 'Fault log',
+          ),
+          // BottomNavigationBarItem(
+          //   icon: Icon(Icons.person),
+          //   label: 'Tab 3',
+          // ),
+        ],
+      ),
     );
   }
 
@@ -541,9 +602,10 @@ class _BluetoothScreenState extends State<BluetoothScreen>
     if (vinNumber.length > 17) {
       if (await obd2.isListenToDataInitialed) {
         await Future.delayed(Duration(milliseconds: 1500));
-        vinNumber = vinNumber.substring(19);
+        vinNumber = vinNumber.split(':').sublist(1).join();
         print(vinNumber);
         vinNumber = decodeHexASCII2(vinNumber);
+        vinNumber = vinNumber.substring(vinNumber.length - 17);
         print(vinNumber.length);
         print(vinNumber);
         var vin = VIN(number: vinNumber, extended: true);
