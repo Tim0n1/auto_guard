@@ -1,4 +1,5 @@
 import 'package:obd2_plugin/obd2_plugin.dart';
+import 'package:convert/convert.dart';
 
 String decodeHexASCII(String encoded) {
   List<String> hexValues = encoded.split(' ');
@@ -28,7 +29,7 @@ String decodeHexASCII2(String encoded) {
           decodedString +=
               String.fromCharCodes(bytes); // Convert bytes to characters
         } else {
-          decodedString += part; // Append non-hex parts directly
+          //decodedString += part; // Append non-hex parts directly
         }
       }
     } catch (e) {
@@ -36,6 +37,26 @@ String decodeHexASCII2(String encoded) {
     }
   }
 
+  return decodedString;
+}
+
+String decodeHexASCII3(String encoded) {
+  List<String> parts = encoded.split(':'); // Split the string by semicolons
+  String decodedString = '';
+  for (int i = 1; i < parts.length; i++) {
+    // remove every whitespace from parts[i]
+    parts[i] = parts[i].replaceAll(RegExp(r"\s+"), "");
+    if (parts[i].length % 2 != 0) {
+      parts[i] = parts[i].substring(0, parts[i].length - 1);
+    }
+    print(parts[i]);
+    print('-------------------------------');
+    List<int> bytes = hex.decode(parts[i]); // Decoding the hexadecimal string
+
+    String decodedPart = String.fromCharCodes(bytes);
+    decodedString += decodedPart;
+  }
+  decodedString = decodedString.substring(decodedString.length - 17);
   return decodedString;
 }
 

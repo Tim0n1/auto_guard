@@ -59,4 +59,17 @@ class PostgresService {
       print(e);
     }
   }
+
+  Future<bool> checkConnection() async {
+    try {
+      if (_connection?.isOpen == true) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print(e);
+      return false;
+    }
+  }
 }

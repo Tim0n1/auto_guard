@@ -3,20 +3,24 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'utils/evenrControllerProvider.dart';
 
 import 'package:flutter/material.dart';
 
 class LiveDataPage extends StatefulWidget {
   final Stream? stream;
   final StreamController? controller;
-  const LiveDataPage({this.stream, required this.controller});
+  const LiveDataPage({this.stream, this.controller});
 
   @override
   _LiveDataPageState createState() => _LiveDataPageState();
 }
 
-class _LiveDataPageState extends State<LiveDataPage> {
+class _LiveDataPageState extends State<LiveDataPage> with AutomaticKeepAliveClientMixin{
+  @override
+  bool get wantKeepAlive => true;
   List<Map<String, dynamic>> data = [];
+  StreamController? eventController;
   StreamSubscription<dynamic>? _streamSubscription;
 
   @override
@@ -45,12 +49,13 @@ class _LiveDataPageState extends State<LiveDataPage> {
     //updateData(); // Update the data
   }
 
+
   void updateData(String event) async {
     data = [];
     List<dynamic> parsedJson = [];
     parsedJson = json.decode(event);
     setState(() {
-      for (int i = 0; i < parsedJson.length-1; i++) {
+      for (int i = 0; i < parsedJson.length - 1; i++) {
         data.insert(i, {
           'parameter': parsedJson[i]['title'],
           'value': "${parsedJson[i]['response']} ${parsedJson[i]['unit']}"
@@ -69,10 +74,8 @@ class _LiveDataPageState extends State<LiveDataPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Live Data'),
-      ),
       body: Container(
         padding: EdgeInsets.all(16.0),
         child: SingleChildScrollView(
