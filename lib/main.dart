@@ -118,8 +118,9 @@ class _MainPageState extends State<MainPage> {
           setState(() => _currentIndex = index);
         },
         children: <Widget>[
-          HomeScreen(controller:_eventController), // Replace with your screen
-          LiveDataPage(controller: _eventController), // Replace with your screen
+          HomeScreen(controller: _eventController), // Replace with your screen
+          LiveDataPage(
+              controller: _eventController), // Replace with your screen
           FaultLogPage(), // Replace with your screen
           // Add more screens if you have them
         ],
@@ -130,7 +131,7 @@ class _MainPageState extends State<MainPage> {
           _pageController.animateToPage(index,
               duration: Duration(milliseconds: 200), curve: Curves.easeIn);
         },
-        items: [
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',

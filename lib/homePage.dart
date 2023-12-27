@@ -73,10 +73,9 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   @override
   void initState() {
+    super.initState();
     _initInternetConnection();
     _checkDBconnection();
-    print(111111);
-    super.initState();
     _initBluetooth();
     _startDeviceRefreshTimer();
     startParamsExtraction();
@@ -89,17 +88,17 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
     super.dispose();
   }
 
-  Future<int?> getId() async {
+  Future<int?> inserUserId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     int? id = prefs.getInt('generatedId');
+    postgresService.addUser(id);
     return id;
   }
 
   Future<void> startParamsExtraction() async {
     StreamController _eventController = widget.controller!;
-    Connection? _conn = await postgresService.getConnection();
-    int? id = await getId();
-    //await postgresService.addUser(id);
+
+    print(id);
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
     while (true) {
@@ -113,7 +112,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
       DartPluginRegistrant.ensureInitialized();
 
       if (_connectedDevice != null) {
-        String response = '';
         if (!await obd2.hasConnection) {
           obd2.getConnection(
               _connectedDevice!, (connection) => null, (message) => null);
@@ -152,7 +150,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                 ),
               );
 
-              print("$command => $response");
+              //print("$command => $response");
             });
           }
           while (await obd2.hasConnection && _connectedDevice != null) {
@@ -203,21 +201,51 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   }
 
   void _checkDBconnection() async {
-    while (true) {
-      await Future.delayed(Duration(seconds: 2));
-      bool dbConnection = await postgresService.checkConnection();
-      setState(() {
-        print(dbConnection);
-        _isDatabaseConnected = dbConnection;
-      });
-      if (dbConnection == false) {
-        Connection? _conn = await postgresService.getConnection();
-        bool dbConnection = await postgresService.checkConnection();
-        setState(() {
-          print('connected');
-          _isDatabaseConnected = dbConnection;
-        });
+    bool dbConnection = false;
+    bool isUserAdded = false;
+    try {
+      while (true) {
+        await Future.delayed(Duration(seconds: 2));
+        print('checking DB connection');
+        try {
+          if (await InternetConnectionChecker().hasConnection) {
+            try {
+              dbConnection = await postgresService.checkConnection();
+              //print('$dbConnection 1111');
+            } catch (e) {
+              print(e);
+            }
+            if (dbConnection == true) {
+              if (!isUserAdded) {
+                int? id = await inserUserId();
+                isUserAdded = true;
+              }
+
+              setState(() {
+                _isDatabaseConnected = dbConnection;
+              });
+            } else {
+              if (await InternetConnectionChecker().hasConnection) {
+                Connection? _conn = await postgresService.getConnection();
+                dbConnection = await postgresService.checkConnection();
+                setState(() {
+                  _isDatabaseConnected = dbConnection;
+                });
+              }
+            }
+          } else {
+            setState(() {
+              _isDatabaseConnected = false;
+            });
+          }
+        } catch (e) {
+          print(e);
+          _isDatabaseConnected = false;
+        }
       }
+    } catch (e) {
+      print(e);
+      _isDatabaseConnected = false;
     }
   }
 
@@ -419,19 +447,94 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                           : Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 8), // Add spacing between texts
+                  //const SizedBox(height: 8), // Add spacing between texts
                   Text(
-                    isConnected ? 'Connected Device:' : '',
+                    isConnected
+                        ? 'Connected Device:\n ${_connectedDevice?.name}'
+                        : 'Not connected',
                     style: TextStyle(
                       color: isConnected ? Colors.green : Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
-                    '${_connectedDevice?.name ?? 'Not connected'}',
-                    style: TextStyle(
-                      color: isConnected ? Colors.green : Colors.black,
-                    ),
+                  // Text(
+                  //   _connectedDevice?.name ?? 'Not connected',
+                  //   style: TextStyle(
+                  //     color: isConnected ? Colors.green : Colors.black,
+                  //   ),
+                  // ),
+                  Row(
+                    children: [
+                      Visibility(
+                        visible: _isInternetEnabled,
+                        child: Icon(
+                          Icons.wifi,
+                          color: Colors.green,
+                        ),
+                      ),
+                      Visibility(
+                        visible: !_isInternetEnabled,
+                        child: TweenAnimationBuilder<double>(
+                          duration: Duration(milliseconds: 500),
+                          tween: Tween<double>(begin: 0.0, end: 1.0),
+                          builder: (_, double value, __) {
+                            return Opacity(
+                              opacity: value,
+                              child: Icon(
+                                Icons.wifi,
+                                color: Colors.red,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      Visibility(
+                        visible: _isDatabaseConnected,
+                        child: Icon(
+                          Icons.satellite_alt,
+                          color: Colors.green,
+                        ),
+                      ),
+                      Visibility(
+                        visible: !_isDatabaseConnected,
+                        child: TweenAnimationBuilder<double>(
+                          duration: Duration(milliseconds: 500),
+                          tween: Tween<double>(begin: 0.0, end: 1.0),
+                          builder: (_, double value, __) {
+                            return Opacity(
+                              opacity: value,
+                              child: Icon(
+                                Icons.close,
+                                color: Colors.red,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      Visibility(
+                        visible: _isDeviceCompatible,
+                        child: Icon(
+                          Icons.car_repair,
+                          color: Colors.green,
+                        ),
+                      ),
+                      Visibility(
+                        visible: !_isDeviceCompatible,
+                        child: TweenAnimationBuilder<double>(
+                          duration: Duration(milliseconds: 500),
+                          tween: Tween<double>(begin: 0.0, end: 1.0),
+                          builder: (_, double value, __) {
+                            return Opacity(
+                              opacity: value,
+                              child: Icon(
+                                Icons.close,
+                                color: Colors.red,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -483,12 +586,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                           strokeWidth: 3,
                           color: Colors.white,
                         ), // Show loading indicator when isLoading is true
-                      if (_isDatabaseConnected)
-                        Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 24,
-                        ), // Show check icon when isConnected is true
                     ],
                   ),
                 )
