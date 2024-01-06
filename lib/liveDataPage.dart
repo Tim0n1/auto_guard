@@ -5,7 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
-import 'utils/evenrControllerProvider.dart';
+
 
 import 'package:flutter/material.dart';
 

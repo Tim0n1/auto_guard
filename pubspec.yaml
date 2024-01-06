@@ -75,6 +75,8 @@ flutter:
   uses-material-design: true
   assets:
     - lib/images/
+    - lib/images/car_logos/
+    - lib/images/car_logos/optimized/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

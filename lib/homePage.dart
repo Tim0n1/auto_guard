@@ -17,7 +17,8 @@ import 'settingsScreen.dart';
 import 'obd2.dart';
 import 'package:postgres/postgres.dart';
 import 'DB.dart';
-import 'utils/evenrControllerProvider.dart';
+import 'utils/blinkingIcon.dart';
+import 'findImage.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({this.controller});
@@ -45,9 +46,13 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   PostgresService postgresService = PostgresService();
 
   bool _serviceRunning = true;
-  bool _isDeviceCompatible = true;
+  bool _isDeviceCompatible = false;
   bool _isDeviceCompatibleButtonEnabled = true;
-  Map<String, String?> carInformation = {"manufacturer": null, "model": null};
+  Map<String, String?> carInformation = {
+    "manufacturer": 'Toyota',
+    "model": null
+  };
+  String? carManufacturerLogo = '';
   String vinNumber = '';
   Obd2Plugin obd2 = Obd2Plugin();
 
@@ -376,6 +381,26 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
             ),
           ),
           Positioned(
+              top: 220,
+              left: 0,
+              right: 0,
+              child: Container(
+                child: _isDeviceCompatible && carManufacturerLogo != null
+                    ? Image.asset(
+                        carManufacturerLogo!,
+                        width: 110, // Adjust width as needed
+                        height: 110, // Adjust height as needed)
+                    )
+                    : BlinkingIcon(_isDeviceCompatible),
+                //     child: Icon(
+                //   Icons.car_repair,
+                //   size: 50,
+                //   color: _isDeviceCompatible
+                //       ? Colors.black.withOpacity(0.1)
+                //       : Colors.red.withOpacity(0.5),
+                // )
+              )),
+          Positioned(
             bottom: 150,
             left: 0,
             right: 0,
@@ -504,7 +529,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                             return Opacity(
                               opacity: value,
                               child: Icon(
-                                Icons.close,
+                                Icons.satellite_alt,
                                 color: Colors.red,
                               ),
                             );
@@ -527,7 +552,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                             return Opacity(
                               opacity: value,
                               child: Icon(
-                                Icons.close,
+                                Icons.car_repair,
                                 color: Colors.red,
                               ),
                             );
@@ -605,19 +630,25 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
       if (await obd2.isListenToDataInitialed) {
         await Future.delayed(const Duration(milliseconds: 1500));
         vinNumber = decodeHexASCII3(vinNumber);
-        //vinNumber = vinNumber.substring(vinNumber.length - 17);
-        print(vinNumber.length);
-        print(vinNumber);
         var vin = VIN(number: vinNumber, extended: true);
         print(vinNumber);
         String? model = await vin.getModelAsync();
-        print(model);
-        print(vin.getManufacturer());
-        print(vinNumber);
+        String? manufacturer = vin.getManufacturer();
+        try{
+        carManufacturerLogo = await findImageByName(vin.getManufacturer()!);
+        }
+        catch(e){
+          print(e);
+        }
+        // print(model);
+        // print(vin.getManufacturer());
+        // print(vinNumber);
+
         setState(() {
           _isDeviceCompatible = true;
-          carInformation['manufacturer'] = vin.getManufacturer();
+          carInformation['manufacturer'] = manufacturer;
           carInformation['model'] = model;
+          //carManufacturerLogo = carManufacturerLogo;
         });
       }
     } else {
