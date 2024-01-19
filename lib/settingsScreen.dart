@@ -161,7 +161,12 @@ class _SettingsPageState extends State<SettingsPage>
                       }).toList(),
                     ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 15),
+            const Text(
+              'Other Settings',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+            ),
+            
             ListTile(
               title: const Text('Language'),
               trailing: const Icon(Icons.arrow_forward_ios),
@@ -169,7 +174,16 @@ class _SettingsPageState extends State<SettingsPage>
                 // Implement action for language settings
                 // For example: navigate to language selection screen
               },
+
             ),
+            ListTile(
+              title: const Text('Help'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () {
+                // Implement action for language settings
+                // For example: navigate to language selection screen
+              },
+            )
             // Add more settings as needed
           ],
         ),

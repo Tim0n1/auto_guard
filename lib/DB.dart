@@ -3,12 +3,15 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.104';
+String host = '192.168.1.103';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';
 
 class PostgresService {
+  final int? id;
+  PostgresService({this.id});
+
   Connection? _connection;
 
   Future<Connection?> getConnection() async {
@@ -19,7 +22,6 @@ class PostgresService {
       username: username,
       password: 'timonaki1234',
     );
-    SharedPreferences prefs = await SharedPreferences.getInstance();
 
     try {
       _connection = await Connection.open(_endpoint,
@@ -38,15 +40,12 @@ class PostgresService {
   }
 
   void insert(List<dynamic> parsedJson) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    int? id = prefs.getInt('generatedId');
     int rpm = int.parse(parsedJson[0]['response'].split('.')[0]);
     int speed = int.parse(parsedJson[1]['response'].split('.')[0]);
     int temp = int.parse(parsedJson[2]['response'].split('.')[0]);
     DateTime now = DateTime.now();
     String now_string = now.toString().split('.')[0];
 
-    print(now_string);
     await _connection?.execute(
         Sql.named(
             '''INSERT INTO params ("user_id", "RPM", "Speed", "Temperature", "Datetime")
@@ -60,14 +59,14 @@ class PostgresService {
         });
   }
 
-  Future<void> addUser(int? id) async {
+  Future<void> addUser() async {
     bool isAdded = false;
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
       final users =
           await _connection?.execute(Sql.named('''SELECT * FROM users'''));
       for (var user in users!) {
         print(user[0]);
+        print(id);
         if (user[0] == id) {
           isAdded = true;
           print('User already added');
@@ -103,6 +102,76 @@ class PostgresService {
         return false;
       }
       //return isOpen;
+    } catch (e) {
+      print(e);
+      return false;
+    }
+  }
+
+  Future<dynamic> getModels() async {
+    if (_connection != null) {
+      try {
+        final models = await _connection?.execute(
+            Sql.named('''SELECT * FROM models WHERE user_id = @id'''),
+            parameters: {'id': id}).timeout(Duration(seconds: 3));
+        print('models: ${models?.isEmpty}');
+        if (models?.isEmpty != true) {
+          print('are');
+          print(models);
+          return models;
+        } else {
+          return [];
+        }
+      } catch (e) {
+        print(e);
+        return [];
+      }
+    } else {
+      print('Connection is null');
+      return [];
+    }
+  }
+
+  Future<void> addModel(String name, String state) async {
+    bool isAdded = false;
+    print('addModel');
+    print(id);
+    try {
+      final models = await _connection
+          ?.execute(Sql.named('''SELECT name FROM models'''))
+          .timeout(Duration(seconds: 3));
+      print('models1: $models');
+      for (var m in models!) {
+        print(m);
+        if (m[0] == name) {
+          isAdded = true;
+          print('Model already added');
+        }
+      }
+      if (!isAdded) {
+        print(id);
+        await _connection?.execute(
+            Sql.named('''INSERT INTO models ("user_id", "name", "state")
+     VALUES (@id, @name, @state )'''),
+            parameters: {
+              'id': id,
+              'name': name,
+              'state': state
+            }).timeout(Duration(seconds: 3));
+        print('Model added');
+        return;
+      }
+    } catch (e) {
+      print(e);
+    }
+  }
+  Future<bool> deleteModel(String name) async {
+    try {
+      await _connection?.execute(
+          Sql.named('''DELETE FROM models WHERE id = @id AND name = @name'''),
+          parameters: {'id':id,'name': name}).timeout(Duration(seconds: 3));
+      print('Model deleted');
+      return true;
     } catch (e) {
       print(e);
       return false;

@@ -18,7 +18,8 @@ import 'obd2.dart';
 import 'package:postgres/postgres.dart';
 import 'DB.dart';
 import 'utils/blinkingIcon.dart';
-import 'findImage.dart';
+import 'utils/findImage.dart';
+import 'utils/trainingPopUpMenu.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({this.controller});
@@ -30,6 +31,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+
+  // Callback function for training page
+  void _callback(bool isEnabled) {
+    _isDBinsertionEnabled = isEnabled;
+  }
 
   String currentVersion = 'v0.1';
 
@@ -48,6 +54,8 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   bool _serviceRunning = true;
   bool _isDeviceCompatible = false;
   bool _isDeviceCompatibleButtonEnabled = true;
+  bool _isDBinsertionEnabled = false;
+
   Map<String, String?> carInformation = {
     "manufacturer": 'Toyota',
     "model": null
@@ -79,11 +87,13 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   @override
   void initState() {
     super.initState();
+    _setId();
     _initInternetConnection();
     _checkDBconnection();
     _initBluetooth();
     _startDeviceRefreshTimer();
     startParamsExtraction();
+    checkObdCompatibility();
   }
 
   @override
@@ -93,17 +103,22 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
     super.dispose();
   }
 
-  Future<int?> inserUserId() async {
+  void _setId()  async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    int? id = prefs.getInt('generatedId');
-    postgresService.addUser(id);
+    int? newId = prefs.getInt('generatedId');
+    id = newId;
+    postgresService = PostgresService(id: id);
+    print(id);
+  }
+
+  Future<int?> inserUserId() async {
+    postgresService.addUser();
     return id;
   }
 
   Future<void> startParamsExtraction() async {
     StreamController _eventController = widget.controller!;
 
-    print(id);
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
     while (true) {
@@ -137,7 +152,10 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
               parsedJson = json.decode(response);
               vinNumber = parsedJson[parsedJson.length - 1]['response'];
               if (_isDatabaseConnected != false) {
-                postgresService.insert(parsedJson.sublist(1, 4));
+                if (_isDBinsertionEnabled) {
+                  print('inserting');
+                  postgresService.insert(parsedJson.sublist(1, 4));
+                }
               } else {
                 print('no DB connection');
               }
@@ -390,7 +408,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                         carManufacturerLogo!,
                         width: 110, // Adjust width as needed
                         height: 110, // Adjust height as needed)
-                    )
+                      )
                     : BlinkingIcon(_isDeviceCompatible),
                 //     child: Icon(
                 //   Icons.car_repair,
@@ -412,7 +430,10 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => TrainingPage()));
+                            builder: (context) => TrainingPage(
+                                  postgresService: postgresService,
+                                  callback: _callback,
+                                )));
                   },
                   icon: Icon(Icons.fitness_center),
                   style: ElevatedButton.styleFrom(
@@ -568,7 +589,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
         ],
       ),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 15.0, right: 8.0),
+        padding: const EdgeInsets.only(bottom: 0.0, right: 0.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -582,7 +603,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                         ? "Device is not\n compatible"
                         : carInformation['manufacturer'] == null
                             ? 'Check OBD\n compatibility'
-                            : "${carInformation['manufacturer']}\n${carInformation['model']}",
+                            : "${carInformation['manufacturer']} ${carInformation['model'] ?? ''}",
                     textAlign: TextAlign.end,
                     style: const TextStyle(
                       fontSize: 14,
@@ -591,29 +612,29 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                     ),
                   ),
                 ),
-                const SizedBox(
-                    width: 8), // Add some space between the button and text
-                FloatingActionButton(
-                  onPressed:
-                      _isDeviceCompatibleButtonEnabled ? checkObdButton : null,
-                  backgroundColor: Colors.transparent,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Image.asset(
-                        'lib/images/obd_icon.png', // Replace with your icon asset path
-                        // Adjust height as needed
-                        // You can also use other properties available in Image.asset
-                      ),
-                      if (!_isDeviceCompatibleButtonEnabled)
-                        const CircularProgressIndicator(
-                          strokeAlign: BorderSide.strokeAlignOutside,
-                          strokeWidth: 3,
-                          color: Colors.white,
-                        ), // Show loading indicator when isLoading is true
-                    ],
-                  ),
-                )
+                // const SizedBox(
+                //     width: 8), // Add some space between the button and text
+                // FloatingActionButton(
+                //   onPressed:
+                //       _isDeviceCompatibleButtonEnabled ? checkObdButton : null,
+                //   backgroundColor: Colors.transparent,
+                //   child: Stack(
+                //     alignment: Alignment.center,
+                //     children: [
+                //       Image.asset(
+                //         'lib/images/obd_icon.png', // Replace with your icon asset path
+                //         // Adjust height as needed
+                //         // You can also use other properties available in Image.asset
+                //       ),
+                //       if (!_isDeviceCompatibleButtonEnabled)
+                //         const CircularProgressIndicator(
+                //           strokeAlign: BorderSide.strokeAlignOutside,
+                //           strokeWidth: 3,
+                //           color: Colors.white,
+                //         ), // Show loading indicator when isLoading is true
+                //     ],
+                //   ),
+                // )
               ],
             ),
           ],
@@ -622,42 +643,44 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  Future<void> checkObdButton() async {
-    setState(() {
-      _isDeviceCompatibleButtonEnabled = false;
-    });
-    if (vinNumber.length > 17) {
-      if (await obd2.isListenToDataInitialed) {
-        await Future.delayed(const Duration(milliseconds: 1500));
-        vinNumber = decodeHexASCII3(vinNumber);
-        var vin = VIN(number: vinNumber, extended: true);
-        print(vinNumber);
-        String? model = await vin.getModelAsync();
-        String? manufacturer = vin.getManufacturer();
-        try{
-        carManufacturerLogo = await findImageByName(vin.getManufacturer()!);
-        }
-        catch(e){
-          print(e);
-        }
-        // print(model);
-        // print(vin.getManufacturer());
-        // print(vinNumber);
+  void checkObdCompatibility() async {
+    while (true) {
+      await Future.delayed(const Duration(milliseconds: 3000));
+      setState(() {
+        _isDeviceCompatibleButtonEnabled = false;
+      });
+      if (vinNumber.length > 17) {
+        if (await obd2.isListenToDataInitialed) {
+          await Future.delayed(const Duration(milliseconds: 1500));
+          vinNumber = decodeHexASCII3(vinNumber);
+          var vin = VIN(number: vinNumber, extended: true);
+          print(vinNumber);
+          String? model = await vin.getModelAsync();
+          String? manufacturer = vin.getManufacturer();
+          try {
+            carManufacturerLogo = await findImageByName(vin.getManufacturer()!);
+          } catch (e) {
+            print(e);
+          }
+          // print(model);
+          // print(vin.getManufacturer());
+          // print(vinNumber);
 
+          setState(() {
+            _isDeviceCompatible = true;
+            carInformation['manufacturer'] = manufacturer;
+            carInformation['model'] = model;
+            //carManufacturerLogo = carManufacturerLogo;
+          });
+        }
+      } else {
         setState(() {
-          _isDeviceCompatible = true;
-          carInformation['manufacturer'] = manufacturer;
-          carInformation['model'] = model;
-          //carManufacturerLogo = carManufacturerLogo;
+          _isDeviceCompatible = false;
         });
       }
-    } else {
       setState(() {
-        _isDeviceCompatible = false;
+        _isDeviceCompatibleButtonEnabled = true;
       });
     }
-    setState(() {
-      _isDeviceCompatibleButtonEnabled = true;
-    });
   }
 }

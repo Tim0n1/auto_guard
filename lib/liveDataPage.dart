@@ -24,10 +24,6 @@ class _LiveDataPageState extends State<LiveDataPage>
   bool get wantKeepAlive => true;
   List<Map<String, dynamic>> data = [];
   List<FlSpot> _chartData = [
-    FlSpot(0, 0),
-    FlSpot(1, 1),
-    FlSpot(2, 2),
-    FlSpot(3, 3)
   ];
   StreamController? eventController;
   StreamSubscription<dynamic>? _streamSubscription;

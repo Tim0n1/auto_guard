@@ -17,7 +17,6 @@ Future<String?> findImageByName(String name) async{
   for (var item in data) {
     if (item['name'] == name) {
       image = item['image']['localOptimized'].substring(2);
-      print(image);
       return path + image;
       //break;
     }

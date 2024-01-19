@@ -49,8 +49,6 @@ String decodeHexASCII3(String encoded) {
     if (parts[i].length % 2 != 0) {
       parts[i] = parts[i].substring(0, parts[i].length - 1);
     }
-    print(parts[i]);
-    print('-------------------------------');
     List<int> bytes = hex.decode(parts[i]); // Decoding the hexadecimal string
 
     String decodedPart = String.fromCharCodes(bytes);
