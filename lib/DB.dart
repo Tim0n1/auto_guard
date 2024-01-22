@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.103';
+String host = '192.168.1.105';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';
@@ -134,22 +134,18 @@ class PostgresService {
 
   Future<void> addModel(String name, String state) async {
     bool isAdded = false;
-    print('addModel');
-    print(id);
     try {
       final models = await _connection
           ?.execute(Sql.named('''SELECT name FROM models'''))
           .timeout(Duration(seconds: 3));
       print('models1: $models');
       for (var m in models!) {
-        print(m);
         if (m[0] == name) {
           isAdded = true;
           print('Model already added');
         }
       }
       if (!isAdded) {
-        print(id);
         await _connection?.execute(
             Sql.named('''INSERT INTO models ("user_id", "name", "state")
      VALUES (@id, @name, @state )'''),
@@ -165,11 +161,13 @@ class PostgresService {
       print(e);
     }
   }
+
   Future<bool> deleteModel(String name) async {
     try {
       await _connection?.execute(
-          Sql.named('''DELETE FROM models WHERE id = @id AND name = @name'''),
-          parameters: {'id':id,'name': name}).timeout(Duration(seconds: 3));
+          Sql.named(
+              '''DELETE FROM models WHERE user_id = @id AND name = @name'''),
+          parameters: {'id': id, 'name': name}).timeout(Duration(seconds: 3));
       print('Model deleted');
       return true;
     } catch (e) {

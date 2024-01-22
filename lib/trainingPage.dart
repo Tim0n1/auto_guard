@@ -6,9 +6,13 @@ import 'dart:async';
 
 class TrainingPage extends StatefulWidget {
   final PostgresService? postgresService;
-  final Function(bool)? callback;
+  final Function(bool)? serviceCallback;
+  final Function() statesCallback;
 
-  const TrainingPage({this.postgresService, this.callback});
+  const TrainingPage(
+      {this.postgresService,
+      this.serviceCallback,
+      required this.statesCallback});
 
   @override
   _TrainingState createState() => _TrainingState();
@@ -18,6 +22,7 @@ class _TrainingState extends State<TrainingPage> {
   bool _isGatheringEnabled = false;
   bool _isModelRefreshingEnabled = true;
   bool _isLoading = false;
+  bool _isSnackBarVisible = false;
   double _progressValue = 0.0;
   bool _additionalButtonEnabled = false;
   bool _secondProgressBarStarted = false;
@@ -64,12 +69,11 @@ class _TrainingState extends State<TrainingPage> {
 
   void _startRefreshModels() async {
     while (true) {
-      await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(Duration(seconds: 1));
       if (_isModelRefreshingEnabled == false) {
         break;
       }
       try {
-        print(2);
         List<dynamic> new_models = await _getModels();
         setState(() {
           models = new_models;
@@ -80,16 +84,53 @@ class _TrainingState extends State<TrainingPage> {
     }
   }
 
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // Set the flag to indicate that the SnackBar is visible
+    setState(() {
+      _isSnackBarVisible = true;
+    });
+
+    // Schedule a callback to reset the flag after the SnackBar is dismissed
+    Future.delayed(Duration(seconds: 2), () {
+      setState(() {
+        _isSnackBarVisible = false;
+      });
+    });
+  }
+
   void _dataGathering() {
     setState(() {
-      widget.callback!(true);
-      _isLoading = true;
+      //widget.serviceCallback!(true);
       _progressValue = 0.0;
       _additionalButtonEnabled = false; // Disable additional button initially
       _secondProgressBarStarted = false; // Reset second progress bar
       _secondProgressValue = 0.0;
     });
 
+    if (widget.statesCallback()['isInternetEnabled'] == false) {
+      _showSnackBar('Internet is not enabled');
+      return;
+    } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
+      _showSnackBar('Database is not enabled');
+      return;
+    } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
+      _showSnackBar('Device is not compatible');
+      return;
+    } else if (_selectedModelIndex == -1 || models.isEmpty) {
+      _showSnackBar('No model selected');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
     const progressIncrement = 0.02;
     Timer.periodic(Duration(milliseconds: 50), (timer) {
       try {
@@ -145,7 +186,17 @@ class _TrainingState extends State<TrainingPage> {
               ElevatedButton(
                 onPressed: _secondProgressBarStarted
                     ? null
-                    : (_isLoading ? null : _dataGathering),
+                    : (_isLoading
+                        ? null
+                        : () {
+                            if (_isSnackBarVisible == true) {
+                              //ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                              return;
+                            } else {
+                              print("pressed");
+                              _dataGathering();
+                            }
+                          }),
                 child: Text(_isLoading ? 'Loading...' : 'Start data gathering'),
               ),
               SizedBox(height: 20),
@@ -182,15 +233,96 @@ class _TrainingState extends State<TrainingPage> {
         ),
         Positioned(
           bottom: 8.0,
-          right: 8.0,
+          right: 12.0,
           child: Text(
-            _selectedModelIndex.toString(), // Add your desired label text here
+            _selectedModelIndex == -1 || models.isEmpty
+                ? 'No model selected'
+                : 'Selected model: ${models[_selectedModelIndex][2]}',
             style: TextStyle(
-              fontSize: 16.0,
+              fontSize: 14.0,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
+        Positioned(
+            left: 0,
+            bottom: 15,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Visibility(
+                    visible: widget.statesCallback()['isInternetEnabled'],
+                    child: Icon(
+                      Icons.wifi,
+                      color: Colors.green,
+                    ),
+                  ),
+                  Visibility(
+                    visible: !widget.statesCallback()['isInternetEnabled'],
+                    child: TweenAnimationBuilder<double>(
+                      duration: Duration(milliseconds: 500),
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      builder: (_, double value, __) {
+                        return Opacity(
+                          opacity: value,
+                          child: Icon(
+                            Icons.wifi,
+                            color: Colors.red,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Visibility(
+                    visible: widget.statesCallback()['isDatabaseEnabled'],
+                    child: Icon(
+                      Icons.satellite_alt,
+                      color: Colors.green,
+                    ),
+                  ),
+                  Visibility(
+                    visible: !widget.statesCallback()['isDatabaseEnabled'],
+                    child: TweenAnimationBuilder<double>(
+                      duration: Duration(milliseconds: 500),
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      builder: (_, double value, __) {
+                        return Opacity(
+                          opacity: value,
+                          child: Icon(
+                            Icons.satellite_alt,
+                            color: Colors.red,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Visibility(
+                    visible: widget.statesCallback()['isDeviceCompatible'],
+                    child: Icon(
+                      Icons.car_repair,
+                      color: Colors.green,
+                    ),
+                  ),
+                  Visibility(
+                    visible: !widget.statesCallback()['isDeviceCompatible'],
+                    child: TweenAnimationBuilder<double>(
+                      duration: Duration(milliseconds: 500),
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      builder: (_, double value, __) {
+                        return Opacity(
+                          opacity: value,
+                          child: Icon(
+                            Icons.car_repair,
+                            color: Colors.red,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ))
       ]),
     );
   }

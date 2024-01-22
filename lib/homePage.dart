@@ -32,9 +32,17 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
-  // Callback function for training page
-  void _callback(bool isEnabled) {
+  // Callback functions for training page
+  void _enableInsertionCallback(bool isEnabled) {
     _isDBinsertionEnabled = isEnabled;
+  }
+
+  Map<String, bool> _connectionsStateCallback() {
+    return {
+      'isInternetEnabled': _isInternetEnabled,
+      'isDatabaseEnabled': _isDatabaseConnected,
+      'isDeviceCompatible': _isDeviceCompatible,
+    };
   }
 
   String currentVersion = 'v0.1';
@@ -432,7 +440,8 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                         MaterialPageRoute(
                             builder: (context) => TrainingPage(
                                   postgresService: postgresService,
-                                  callback: _callback,
+                                  statesCallback: _connectionsStateCallback,
+                                  serviceCallback: _enableInsertionCallback,
                                 )));
                   },
                   icon: Icon(Icons.fitness_center),
@@ -612,29 +621,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                     ),
                   ),
                 ),
-                // const SizedBox(
-                //     width: 8), // Add some space between the button and text
-                // FloatingActionButton(
-                //   onPressed:
-                //       _isDeviceCompatibleButtonEnabled ? checkObdButton : null,
-                //   backgroundColor: Colors.transparent,
-                //   child: Stack(
-                //     alignment: Alignment.center,
-                //     children: [
-                //       Image.asset(
-                //         'lib/images/obd_icon.png', // Replace with your icon asset path
-                //         // Adjust height as needed
-                //         // You can also use other properties available in Image.asset
-                //       ),
-                //       if (!_isDeviceCompatibleButtonEnabled)
-                //         const CircularProgressIndicator(
-                //           strokeAlign: BorderSide.strokeAlignOutside,
-                //           strokeWidth: 3,
-                //           color: Colors.white,
-                //         ), // Show loading indicator when isLoading is true
-                //     ],
-                //   ),
-                // )
               ],
             ),
           ],
