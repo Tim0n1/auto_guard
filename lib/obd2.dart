@@ -1,5 +1,8 @@
 import 'package:obd2_plugin/obd2_plugin.dart';
 import 'package:convert/convert.dart';
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 String decodeHexASCII(String encoded) {
   List<String> hexValues = encoded.split(' ');
@@ -59,6 +62,40 @@ String decodeHexASCII3(String encoded) {
 }
 
 class StringJson {
+  List<String> parametersTitles() {
+    List<String> titles = [];
+    List<dynamic> parsedJson = json.decode(params);
+    for (int i = 0; i < parsedJson.length; i++) {
+      if (parsedJson[i]['title'] == 'VIN number') {
+        continue;
+      }
+      titles.add(parsedJson[i]['title']);
+    }
+    return titles;
+  }
+
+  Future<String> getChosenParams() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    //List<String> titles = parametersTitles();
+    List<String>? chosenParams = prefs.getStringList('parameters');
+    List<dynamic> parsedParams = []; 
+    String chosenParamsString = '';
+    if (chosenParams == null || chosenParams.isEmpty) {
+      return classicParams;
+    }
+
+    List<dynamic> parsedJson = json.decode(params);
+
+    for (int i = 0; i < parsedJson.length; i++) {
+      if (chosenParams.contains(parsedJson[i]['title'])) {
+        parsedParams.add(parsedJson[i]);
+      }
+    }
+    parsedParams.add(parsedJson[parsedJson.length - 1]);
+    chosenParamsString = json.encode(parsedParams);
+    return chosenParamsString;
+  }
+
   String checkObd = '''[
     {
       "PID": "09 02",
@@ -68,7 +105,7 @@ class StringJson {
       "status": true
     }
   ]''';
-  String params = '''[
+  String classicParams = '''[
     {
         "PID": "AT RV",
         "length": 4,
@@ -129,8 +166,56 @@ class StringJson {
       "description": "",
       "status": true
     }
-
   ]''';
+  String params = '''[
+    {
+        "PID": "AT RV",
+        "length": 4,
+        "title": "Напрежение на акумулатора",
+        "unit": "V",
+        "description": "<str>",
+        "status": true
+    },
+    {
+        "PID": "01 0C",
+        "length": 2,
+        "title": "Обороти",
+        "unit": "RPM",
+        "description": "<double>, (( [0] * 256) + [1] ) / 4",
+        "status": true
+    },
+    {
+        "PID": "01 0D",
+        "length": 1,
+        "title": "Скорост на автомобила",
+        "unit": "Kh",
+        "description": "<int>, [0]",
+        "status": true
+    },
+    {
+        "PID": "01 05",
+        "length": 1,
+        "title": "Температура на двигателя",
+        "unit": "°C",
+        "description": "<int>, [0] - 40",
+        "status": true
+    },
+    {
+        "PID": "01 0B",
+        "length": 1,
+        "title": "Абсолютно налягане в колектора",
+        "unit": "kPa",
+        "description": "<int>, [0]",
+        "status": true
+    },
+    {
+      "PID": "09 02",
+      "length": 17,
+      "title": "VIN number",
+      "description": "<str>",
+      "status": true
+    }
+]''';
 
   String fullConfig = '''[
             {

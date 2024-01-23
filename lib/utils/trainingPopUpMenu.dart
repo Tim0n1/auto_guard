@@ -33,14 +33,14 @@ class _MyListState extends State<MyList> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Create New Model'),
+              title: const Text('Create New Model'),
               content: SingleChildScrollView(
                 child: ListBody(
                   children: <Widget>[
-                    Text('Enter the details for the new model:'),
+                    const Text('Enter the details for the new model:'),
                     TextField(
                       controller: _modelNameController,
-                      decoration: InputDecoration(labelText: 'Model Name'),
+                      decoration: const InputDecoration(labelText: 'Model Name'),
                     ),
                   ],
                 ),
@@ -52,7 +52,7 @@ class _MyListState extends State<MyList> {
                       : () {
                           Navigator.of(context).pop();
                         },
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -70,7 +70,7 @@ class _MyListState extends State<MyList> {
                       widget.postgresService?.addModel(modelName, 'Empty');
 
                       while (!modelFound) {
-                        await Future.delayed(Duration(milliseconds: 500));
+                        await Future.delayed(const Duration(milliseconds: 500));
                         models = widget.modelsCallback!();
                         for (var m in models!) {
                           if (m[2] == modelName) {
@@ -89,8 +89,8 @@ class _MyListState extends State<MyList> {
                     _modelNameController.clear();
                   },
                   child: _isLoading
-                      ? CircularProgressIndicator() // Show loading indicator
-                      : Text('Create'),
+                      ? const CircularProgressIndicator() // Show loading indicator
+                      : const Text('Create'),
                 ),
               ],
             );
@@ -108,8 +108,8 @@ class _MyListState extends State<MyList> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Delete Model'),
-              content: SingleChildScrollView(
+              title: const Text('Delete Model'),
+              content: const SingleChildScrollView(
                 child: ListBody(
                   children: <Widget>[
                     Text('Are you sure you want to delete this model?'),
@@ -123,7 +123,7 @@ class _MyListState extends State<MyList> {
                       : () {
                           Navigator.of(context).pop();
                         },
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
                 TextButton(
                   onPressed: () async {
@@ -138,7 +138,7 @@ class _MyListState extends State<MyList> {
                     }
                     bool isDeleted = false;
                     while (true) {
-                      await Future.delayed(Duration(milliseconds: 500));
+                      await Future.delayed(const Duration(milliseconds: 500));
                       models = widget.modelsCallback!();
                       isDeleted = true;
                       for (var m in models!) {
@@ -157,8 +157,8 @@ class _MyListState extends State<MyList> {
                     Navigator.of(context).pop();
                   },
                   child: _isLoading
-                      ? CircularProgressIndicator() // Show loading indicator
-                      : Text('Delete'),
+                      ? const CircularProgressIndicator() // Show loading indicator
+                      : const Text('Delete'),
                 ),
               ],
             );
@@ -186,10 +186,10 @@ class _MyListState extends State<MyList> {
             child: Expanded(
               child: ListView.separated(
                 shrinkWrap: true,
-                physics: ClampingScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 itemCount: widget.modelsCallback!().length,
                 separatorBuilder: (BuildContext context, int index) {
-                  return Divider(height: 0, color: Colors.transparent);
+                  return const Divider(height: 0, color: Colors.transparent);
                 },
                 itemBuilder: (BuildContext context, int index) {
                   return ListTile(
@@ -199,8 +199,6 @@ class _MyListState extends State<MyList> {
                         ? Colors.deepPurpleAccent.withOpacity(0.3)
                         : null,
                     onTap: () {
-                      print(index);
-                      print(_selectedItemIndex);
                       setState(() {
                         if (_selectedItemIndex == index) {
                           _currentModelIndex = _selectedItemIndex;
@@ -219,7 +217,7 @@ class _MyListState extends State<MyList> {
           Visibility(
             visible: _isVisible,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 35),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Row(
@@ -228,9 +226,9 @@ class _MyListState extends State<MyList> {
                       onPressed: () {
                         _showCreateNewModelDialog();
                       },
-                      child: Text('Create new model'),
+                      child: const Text('Create new model'),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: () {
                         if (widget.modelsCallback!().isEmpty) {
@@ -238,7 +236,7 @@ class _MyListState extends State<MyList> {
                         }
                         _showDeleteModelDialog();
                       },
-                      child: Text('Delete'),
+                      child: const Text('Delete'),
                     ),
                   ],
                 ),

@@ -107,7 +107,7 @@ class _TrainingState extends State<TrainingPage> {
 
   void _dataGathering() {
     setState(() {
-      //widget.serviceCallback!(true);
+      widget.serviceCallback!(true);
       _progressValue = 0.0;
       _additionalButtonEnabled = false; // Disable additional button initially
       _secondProgressBarStarted = false; // Reset second progress bar
@@ -193,7 +193,6 @@ class _TrainingState extends State<TrainingPage> {
                               //ScaffoldMessenger.of(context).hideCurrentSnackBar();
                               return;
                             } else {
-                              print("pressed");
                               _dataGathering();
                             }
                           }),
@@ -246,9 +245,9 @@ class _TrainingState extends State<TrainingPage> {
         ),
         Positioned(
             left: 0,
-            bottom: 15,
+            bottom: 0,
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               child: Row(
                 children: [
                   Visibility(

@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.105';
+String host = '192.168.1.102';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';

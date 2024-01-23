@@ -111,7 +111,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
     super.dispose();
   }
 
-  void _setId()  async {
+  void _setId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     int? newId = prefs.getInt('generatedId');
     id = newId;
@@ -162,7 +162,8 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
               if (_isDatabaseConnected != false) {
                 if (_isDBinsertionEnabled) {
                   print('inserting');
-                  postgresService.insert(parsedJson.sublist(1, 4));
+                  postgresService
+                      .insert(parsedJson.sublist(0, parsedJson.length - 1));
                 }
               } else {
                 print('no DB connection');
@@ -185,9 +186,9 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
             });
           }
           while (await obd2.hasConnection && _connectedDevice != null) {
-            await Future.delayed(Duration(
-                milliseconds:
-                    await obd2.getParamsFromJSON(StringJson().params)));
+            String params = await StringJson().getChosenParams();
+            await Future.delayed(
+                Duration(milliseconds: await obd2.getParamsFromJSON(params)));
           }
         }
       } else {
@@ -631,7 +632,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   void checkObdCompatibility() async {
     while (true) {
-      await Future.delayed(const Duration(milliseconds: 3000));
+      await Future.delayed(const Duration(milliseconds: 2000));
       setState(() {
         _isDeviceCompatibleButtonEnabled = false;
       });
