@@ -1,47 +1,84 @@
 // ignore_for_file: prefer_const_constructors
+import 'dart:math';
+
+import 'package:shared_preferences/shared_preferences.dart';
+import 'utils/server_client.dart';
 import 'utils/trainingPopUpMenu.dart';
 import 'DB.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:percent_indicator/percent_indicator.dart';
+import 'utils/blinkingIcon.dart';
 
 class TrainingPage extends StatefulWidget {
   final PostgresService? postgresService;
-  final Function(bool)? serviceCallback;
+  final Function(bool, int)? serviceCallback;
   final Function() statesCallback;
+  final Function() modelCallback;
 
   const TrainingPage(
       {this.postgresService,
       this.serviceCallback,
-      required this.statesCallback});
+      required this.statesCallback,
+      required this.modelCallback});
 
   @override
   _TrainingState createState() => _TrainingState();
 }
 
 class _TrainingState extends State<TrainingPage> {
+  SharedPreferences? prefs;
+
   bool _isGatheringEnabled = false;
+  bool _isTrainingEnabled = false;
   bool _isModelRefreshingEnabled = true;
   bool _isLoading = false;
   bool _isSnackBarVisible = false;
+  bool _isSelectModelVisible = false;
   double _progressValue = 0.0;
-  bool _additionalButtonEnabled = false;
+  bool _trainingButtonEnabled = false;
   bool _secondProgressBarStarted = false;
   double _secondProgressValue = 0.0;
+  int _dataSize = 0;
+  int _currentModelSize = 0;
+  bool _isInitial = false;
+
+  int _dotAnimationCount = 0;
+  late Timer _dotAnimationTimer;
+  late Timer _dataGatheringTimer;
+  late Timer _refreshModelsTimer;
 
   List<dynamic> models = [];
 
   int _selectedModelIndex = -1;
+  List<dynamic> _selectedModel = [];
+  int modelId = 0;
+  int maxSize = 0;
 
   @override
   void initState() {
-    super.initState();
     _startRefreshModels();
+    super.initState();
+    if (widget.statesCallback()['isDBinsertionEnabled']) {
+      _isInitial = true;
+      _dataGathering();
+    }
+    _startDotAnimation();
+    setMaxDataSize();
   }
 
   @override
   void dispose() {
     _isModelRefreshingEnabled = false;
+    _dataGatheringTimer.cancel();
+    _dotAnimationTimer.cancel();
+    _refreshModelsTimer.cancel();
     super.dispose();
+  }
+
+  void setMaxDataSize() async {
+    prefs = await SharedPreferences.getInstance();
+    _dataSize = prefs?.getInt('size') ?? 0;
   }
 
   List<dynamic> modelsCallback() {
@@ -50,16 +87,23 @@ class _TrainingState extends State<TrainingPage> {
 
   void handleSelectedModel(int index) {
     print("selected model: $index");
-
+    if (index != -1) {
+      if (models[index][3] == models[index][4]) {
+        print(12);
+        _trainingButtonEnabled = true;
+      } else {
+        _trainingButtonEnabled = false;
+      }
+    }
     setState(() {
       _selectedModelIndex = index;
+      _isSelectModelVisible = false;
     });
   }
 
   Future<dynamic> _getModels() async {
     try {
       models = await widget.postgresService?.getModels();
-      //print(1);
       return models;
     } catch (e) {
       print(e);
@@ -68,10 +112,10 @@ class _TrainingState extends State<TrainingPage> {
   }
 
   void _startRefreshModels() async {
-    while (true) {
-      await Future.delayed(Duration(seconds: 1));
+    _refreshModelsTimer =
+        Timer.periodic(Duration(milliseconds: 2000), (timer) async {
       if (_isModelRefreshingEnabled == false) {
-        break;
+        timer.cancel();
       }
       try {
         List<dynamic> new_models = await _getModels();
@@ -81,7 +125,7 @@ class _TrainingState extends State<TrainingPage> {
       } catch (e) {
         print(e);
       }
-    }
+    });
   }
 
   void _showSnackBar(String message) {
@@ -105,43 +149,113 @@ class _TrainingState extends State<TrainingPage> {
     });
   }
 
-  void _dataGathering() {
-    setState(() {
-      widget.serviceCallback!(true);
-      _progressValue = 0.0;
-      _additionalButtonEnabled = false; // Disable additional button initially
-      _secondProgressBarStarted = false; // Reset second progress bar
-      _secondProgressValue = 0.0;
+  void _startDotAnimation() {
+    _dotAnimationTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+      if (!_isGatheringEnabled) {
+        // timer.cancel();
+      } else {
+        setState(() {
+          // Toggle dot animation
+          _dotAnimationCount = (_dotAnimationCount + 1) % 4;
+        });
+      }
     });
+  }
 
-    if (widget.statesCallback()['isInternetEnabled'] == false) {
-      _showSnackBar('Internet is not enabled');
+  void _dataGathering() async {
+    if (_isInitial) {
+      _isInitial = false;
+      try {
+        modelId = widget.modelCallback();
+        models = await _getModels();
+        _selectedModel = models.firstWhere((element) => element[0] == modelId);
+        _selectedModelIndex =
+            models.indexWhere((element) => element[0] == modelId);
+        modelId = _selectedModel[0];
+      } catch (e) {
+        print(e);
+      }
+    } else {
+      if (widget.statesCallback()['isInternetEnabled'] == false) {
+        _showSnackBar('Internet is not enabled');
+        return;
+      } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
+        _showSnackBar('Database is not enabled');
+        return;
+      } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
+        _showSnackBar('Device is not compatible');
+        return;
+      } else if (_selectedModelIndex == -1 || models.isEmpty) {
+        _showSnackBar('No model selected');
+        return;
+      }
+      _selectedModel = models[_selectedModelIndex];
+      modelId = _selectedModel[0];
+    }
+
+    if (_isGatheringEnabled) {
+      print('stop gathering data');
+      setState(() {
+        widget.serviceCallback!(!_isGatheringEnabled, modelId);
+        _isLoading = false;
+        _isGatheringEnabled = false;
+      });
       return;
-    } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
-      _showSnackBar('Database is not enabled');
+    }
+
+    if (_isLoading) {
       return;
-    } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
-      _showSnackBar('Device is not compatible');
-      return;
-    } else if (_selectedModelIndex == -1 || models.isEmpty) {
-      _showSnackBar('No model selected');
+    }
+
+    //int? currentSize;
+    prefs = await SharedPreferences.getInstance();
+
+    //await prefs?.reload();
+    maxSize = await widget.postgresService?.getModelMaxSize(modelId) ?? 0;
+    // bind maxSize to model
+    if (maxSize == 0) {
+      _showSnackBar('Error: Model max_size is not set!');
       return;
     }
 
     setState(() {
+      widget.serviceCallback!(true, modelId);
+      _isGatheringEnabled = true;
+      _progressValue = 0.0;
+      _trainingButtonEnabled = false; // Disable additional button initially
+      _secondProgressBarStarted = false; // Reset second progress bar
+      _secondProgressValue = 0.0;
+    });
+
+    setState(() {
       _isLoading = true;
     });
-    const progressIncrement = 0.02;
-    Timer.periodic(Duration(milliseconds: 50), (timer) {
+    const progressIncrement = 0.01;
+    _dataGatheringTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
       try {
-        setState(() {
-          _progressValue += progressIncrement;
-        });
-        if (_progressValue >= 1.0) {
+        _currentModelSize = await widget.postgresService?.getModelSize(modelId);
+        print('currentSize: $_currentModelSize');
+        print('maxSize: $maxSize');
+        if (_isGatheringEnabled == false) {
           timer.cancel();
-          _isLoading = false;
-          _additionalButtonEnabled = true; // Enable the additional button
+          return;
         }
+        if (_currentModelSize == maxSize) {
+          setState(() {
+            _isGatheringEnabled = false;
+            widget.serviceCallback!(_isGatheringEnabled, modelId);
+            _isLoading = false;
+            _trainingButtonEnabled = true; // Enable additional button
+            _progressValue = 1.0;
+          });
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          print('progressValue: $_progressValue');
+          _progressValue = (_currentModelSize.toDouble() / maxSize.toDouble());
+          print(_progressValue);
+        });
       } catch (e) {
         print(e);
       }
@@ -152,7 +266,8 @@ class _TrainingState extends State<TrainingPage> {
     setState(() {
       _secondProgressBarStarted = true; // Start the second progress bar
     });
-
+    TrainingClient client = TrainingClient();
+    client.startTraining(models[_selectedModelIndex][0]);
     const secondProgressIncrement = 0.02;
     Timer.periodic(Duration(milliseconds: 50), (timer) {
       try {
@@ -178,65 +293,124 @@ class _TrainingState extends State<TrainingPage> {
       ),
       body: Stack(children: [
         Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              SizedBox(height: 50),
-              ElevatedButton(
-                onPressed: _secondProgressBarStarted
-                    ? null
-                    : (_isLoading
-                        ? null
-                        : () {
-                            if (_isSnackBarVisible == true) {
-                              //ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                              return;
-                            } else {
-                              _dataGathering();
-                            }
-                          }),
-                child: Text(_isLoading ? 'Loading...' : 'Start data gathering'),
-              ),
-              SizedBox(height: 20),
-              LinearProgressIndicator(
-                value: _progressValue,
-                minHeight: 10,
-                backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-              ),
-              SizedBox(height: 40),
-              //_additionalButtonEnabled // Render additional button only if progress is 100%
-              ElevatedButton(
-                onPressed: _additionalButtonEnabled ? _training : null,
-                child: Text('Start training'),
-              ),
-              // : SizedBox(), // Placeholder if the button is not enabled
-              SizedBox(height: 20),
-              LinearProgressIndicator(
-                value: _secondProgressValue,
-                minHeight: 10,
-                backgroundColor: const Color.fromARGB(255, 250, 218, 218),
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-              ),
-              SizedBox(height: 40),
-              Expanded(
+            child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SizedBox(height: 50),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    if (_secondProgressBarStarted) {
+                      print('second progress bar started');
+                      return;
+                    } else if (_isSnackBarVisible == true) {
+                      return;
+                    } else {
+                      print('gathering data');
+                      _dataGathering();
+                    }
+                  },
+                  label: Text(_isGatheringEnabled
+                      ? 'Stop gathering data'
+                      : 'Start gathering data'),
+                  icon:
+                      Icon(_isGatheringEnabled ? Icons.stop : Icons.play_arrow),
+                ),
+                if (!_isGatheringEnabled)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Handle the action for the second additional button
+                    },
+                    label: Text('Delete data'),
+                    icon: Icon(Icons.delete),
+                  ),
+              ],
+            ),
+            SizedBox(height: 40),
+            //_additionalButtonEnabled // Render additional button only if progress is 100%
+            ElevatedButton(
+              onPressed: _trainingButtonEnabled ? _training : null,
+              child: Text('Start training'),
+            ),
+            // : SizedBox(), // Placeholder if the button is not enabled
+            SizedBox(height: 20),
+            LinearProgressIndicator(
+              value: _secondProgressValue,
+              minHeight: 10,
+              backgroundColor: const Color.fromARGB(255, 250, 218, 218),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+            ),
+            SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () {
+                if (_isSnackBarVisible) {
+                  return;
+                }
+                if (_isGatheringEnabled) {
+                  _showSnackBar('Can\'t change model when gathering data!');
+                  return;
+                }
+                setState(() {
+                  _isSelectModelVisible = !_isSelectModelVisible;
+                });
+              },
+              child: Text(_isSelectModelVisible
+                  ? 'Hide available models'
+                  : 'Select model'),
+            ),
+
+            Flexible(
+              child: Visibility(
+                maintainState: true,
+                visible: _isSelectModelVisible,
                 child: MyList(
+                  modelsCallback: modelsCallback,
                   onSelectedModel: handleSelectedModel,
                   postgresService: widget.postgresService,
-                  modelsCallback: modelsCallback,
+                  isVisible: _isSelectModelVisible,
                 ),
-              )
-            ],
-          ),
-        ),
+              ),
+            ),
+            SizedBox(height: 50),
+            Visibility(
+              visible: !_isSelectModelVisible,
+              child: Flexible(
+                child: Container(
+                  alignment: Alignment.center,
+                  child: CircularPercentIndicator(
+                    radius: 100.0,
+                    lineWidth: 10.0,
+                    percent: _progressValue,
+                    header: Text(
+                      _isTrainingEnabled
+                          ? "Training..."
+                          : (_isGatheringEnabled
+                              ? "Gathering data${'.' * _dotAnimationCount}"
+                              : ""),
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    center: BlinkingIcon(
+                        widget.statesCallback()['isDeviceCompatible']),
+                    backgroundColor: Colors.grey,
+                    progressColor: Colors.deepPurple.withOpacity(0.8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        )),
         Positioned(
           bottom: 8.0,
           right: 12.0,
           child: Text(
             _selectedModelIndex == -1 || models.isEmpty
                 ? 'No model selected'
-                : 'Selected model: ${models[_selectedModelIndex][2]}',
+                : (!_isGatheringEnabled
+                    ? 'Selected model: ${models[_selectedModelIndex][2]}\n(${models[_selectedModelIndex][3]})\nMax size: $_dataSize '
+                    : ('Selected model: ${_selectedModel[2]}\n(${_currentModelSize})\nMax size: $maxSize ')),
             style: TextStyle(
               fontSize: 14.0,
               fontWeight: FontWeight.bold,

@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.102';
+String host = '192.168.1.100';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';
@@ -39,24 +39,59 @@ class PostgresService {
     print('Connection closed');
   }
 
-  void insert(List<dynamic> parsedJson) async {
-    int rpm = int.parse(parsedJson[0]['response'].split('.')[0]);
-    int speed = int.parse(parsedJson[1]['response'].split('.')[0]);
-    int temp = int.parse(parsedJson[2]['response'].split('.')[0]);
+  void insert(List<dynamic> parsedJson, int? modelId) async {
+    if (_connection == null) {
+      print('Cannot insert data. Connection is null');
+      return;
+    }
+    if (modelId == null) {
+      print('Cannot insert data. Model id is null');
+      return;
+    }
+
+    int modelSize = await getModelSize(modelId);
+    int modelMaxSize = await getModelMaxSize(modelId);
+
+    int? voltage;
+    int? rpm;
+    int? speed;
+    int? temp;
+    int? manifoldPressure;
+    for (var i = 0; i < parsedJson.length; i++) {
+      if (parsedJson[i]['title'] == 'Напрежение на акумулатора') {
+        //voltage = int.parse(parsedJson[i]['response'].split('.')[0]);
+      } else if (parsedJson[i]['title'] == 'Обороти') {
+        rpm = int.parse(parsedJson[i]['response'].split('.')[0]);
+      } else if (parsedJson[i]['title'] == 'Скорост на автомобила') {
+        speed = int.parse(parsedJson[i]['response'].split('.')[0]);
+      } else if (parsedJson[i]['title'] == 'Температура на двигателя') {
+        temp = int.parse(parsedJson[i]['response'].split('.')[0]);
+      } else if (parsedJson[i]['title'] == 'Абсолютно налягане в колектора') {
+        manifoldPressure = int.parse(parsedJson[i]['response'].split('.')[0]);
+      }
+    }
+
     DateTime now = DateTime.now();
     String now_string = now.toString().split('.')[0];
 
     await _connection?.execute(
         Sql.named(
-            '''INSERT INTO params ("user_id", "RPM", "Speed", "Temperature", "Datetime")
-     VALUES (@id ,@rpm, @speed, @temp, @datetime)'''),
+            '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "Datetime")
+     VALUES (@id,@model_id ,@rpm, @speed, @temp, @datetime)'''),
         parameters: {
           'id': id,
           'rpm': rpm,
           'speed': speed,
           'temp': temp,
-          'datetime': now_string
+          'datetime': now_string,
+          'model_id': modelId,
         });
+
+    if (modelSize == modelMaxSize) {
+      print('data is successfully inserted');
+    } else {
+      await setModelSize(modelId, modelSize + 1);
+    }
   }
 
   Future<void> addUser() async {
@@ -113,11 +148,8 @@ class PostgresService {
       try {
         final models = await _connection?.execute(
             Sql.named('''SELECT * FROM models WHERE user_id = @id'''),
-            parameters: {'id': id}).timeout(Duration(seconds: 3));
-        print('models: ${models?.isEmpty}');
+            parameters: {'id': id}).timeout(Duration(milliseconds: 2000));
         if (models?.isEmpty != true) {
-          print('are');
-          print(models);
           return models;
         } else {
           return [];
@@ -132,13 +164,12 @@ class PostgresService {
     }
   }
 
-  Future<void> addModel(String name, String state) async {
+  Future<void> addModel(String name, int size, maxSize) async {
     bool isAdded = false;
     try {
       final models = await _connection
           ?.execute(Sql.named('''SELECT name FROM models'''))
           .timeout(Duration(seconds: 3));
-      print('models1: $models');
       for (var m in models!) {
         if (m[0] == name) {
           isAdded = true;
@@ -147,16 +178,82 @@ class PostgresService {
       }
       if (!isAdded) {
         await _connection?.execute(
-            Sql.named('''INSERT INTO models ("user_id", "name", "state")
-     VALUES (@id, @name, @state )'''),
+            Sql.named('''INSERT INTO models ("user_id", "name", "size", "max_size")
+     VALUES (@id, @name, @size, @max_size )'''),
             parameters: {
               'id': id,
               'name': name,
-              'state': state
+              'size': size,
+              'max_size': maxSize,
             }).timeout(Duration(seconds: 3));
         print('Model added');
         return;
       }
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> setModelMaxSize(int modelId, int size) async {
+    //todo needs fix
+    try {
+      await _connection?.execute(
+          Sql.named(
+              '''UPDATE models SET max_size = @size WHERE model_id = @model_id AND user_id = @id'''),
+          parameters: {
+            'model_id': modelId,
+            'size': size,
+            'id': id,
+          }).timeout(Duration(seconds: 3));
+      return;
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<void> setModelSize(int modelId, int size) async {
+    try {
+      await _connection?.execute(
+          Sql.named(
+              '''UPDATE models SET size = @size WHERE model_id = @model_id AND user_id = @id'''),
+          parameters: {
+            'size': size,
+            'model_id': modelId,
+            'id': id,
+          }).timeout(Duration(seconds: 3));
+
+      return;
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<dynamic> getModelMaxSize(int modelId) async {
+    try {
+      final size = await _connection?.execute(
+          Sql.named(
+              '''SELECT max_size FROM models WHERE model_id = @model_id AND user_id = @id'''),
+          parameters: {
+            'model_id': modelId,
+            'id': id,
+          }).timeout(Duration(seconds: 3));
+      return size?[0][0];
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<dynamic> getModelSize(int modelId) async {
+    try {
+      final size = await _connection?.execute(
+          Sql.named(
+              '''SELECT size FROM models WHERE model_id = @model_id AND user_id = @id'''),
+          parameters: {
+            'model_id': modelId,
+            'id': id,
+          }).timeout(Duration(seconds: 3));
+      print('Model size get $size');
+      return size?[0][0];
     } catch (e) {
       print(e);
     }

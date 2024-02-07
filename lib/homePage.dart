@@ -33,8 +33,16 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   bool get wantKeepAlive => true;
 
   // Callback functions for training page
-  void _enableInsertionCallback(bool isEnabled) {
+  _enableInsertionCallback(bool isEnabled, int modelId) {
     _isDBinsertionEnabled = isEnabled;
+    _modelId = modelId;
+  }
+
+  bool _isInternetEnabled = false;
+  int? _modelId;
+
+  int? _modelIdCallback() {
+    return _modelId;
   }
 
   Map<String, bool> _connectionsStateCallback() {
@@ -42,6 +50,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
       'isInternetEnabled': _isInternetEnabled,
       'isDatabaseEnabled': _isDatabaseConnected,
       'isDeviceCompatible': _isDeviceCompatible,
+      'isDBinsertionEnabled': _isDBinsertionEnabled,
     };
   }
 
@@ -49,7 +58,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   int? id;
 
-  bool _isInternetEnabled = false;
   bool _isDatabaseConnected = false;
 
   BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
@@ -131,7 +139,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
         FlutterLocalNotificationsPlugin();
     while (true) {
       await Future.delayed(const Duration(milliseconds: 1000));
-      //print(_serviceRunning);
       if (!_serviceRunning) {
         print("service not running");
         return;
@@ -150,45 +157,51 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
           print('obd has connection');
           if (!(await obd2.isListenToDataInitialed)) {
             obd2.setOnDataReceived((command, response, requestCode) {
-              if (!_eventController.isClosed) {
-                _eventController.add(response);
-              } else {
-                print("startirame");
-                _eventController = StreamController.broadcast();
-              }
-              List<dynamic> parsedJson = [];
-              parsedJson = json.decode(response);
-              vinNumber = parsedJson[parsedJson.length - 1]['response'];
-              if (_isDatabaseConnected != false) {
-                if (_isDBinsertionEnabled) {
-                  print('inserting');
-                  postgresService
-                      .insert(parsedJson.sublist(0, parsedJson.length - 1));
+              try {
+                if (!_eventController.isClosed) {
+                  _eventController.add(response);
+                } else {
+                  print("startirame");
+                  _eventController = StreamController.broadcast();
                 }
-              } else {
-                print('no DB connection');
-              }
-              flutterLocalNotificationsPlugin.show(
-                notificationId,
-                'S',
-                '${DateTime.now()}',
-                const NotificationDetails(
-                  android: AndroidNotificationDetails(
-                    notificationChannelId,
-                    'MY FOREGROUND SERVICE',
-                    icon: 'ic_bg_service_small',
-                    ongoing: false,
+                List<dynamic> parsedJson = [];
+                parsedJson = json.decode(response);
+                vinNumber = parsedJson[parsedJson.length - 1]['response'];
+                if (_isDatabaseConnected != false) {
+                  if (_isDBinsertionEnabled) {
+                    print('inserting');
+                    postgresService.insert(
+                        parsedJson.sublist(0, parsedJson.length - 1), _modelId);
+                  }
+                } else {
+                  print('no DB connection');
+                }
+                flutterLocalNotificationsPlugin.show(
+                  notificationId,
+                  'S',
+                  '${DateTime.now()}',
+                  const NotificationDetails(
+                    android: AndroidNotificationDetails(
+                      notificationChannelId,
+                      'MY FOREGROUND SERVICE',
+                      icon: 'ic_bg_service_small',
+                      ongoing: false,
+                    ),
                   ),
-                ),
-              );
-
-              //print("$command => $response");
+                );
+              } catch (e) {
+                print(e);
+              }
             });
           }
           while (await obd2.hasConnection && _connectedDevice != null) {
             String params = await StringJson().getChosenParams();
-            await Future.delayed(
-                Duration(milliseconds: await obd2.getParamsFromJSON(params)));
+            try {
+              await Future.delayed(
+                  Duration(milliseconds: await obd2.getParamsFromJSON(params)));
+            } catch (e) {
+              print(e);
+            }
           }
         }
       } else {
@@ -443,6 +456,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                                   postgresService: postgresService,
                                   statesCallback: _connectionsStateCallback,
                                   serviceCallback: _enableInsertionCallback,
+                                  modelCallback: _modelIdCallback,
                                 )));
                   },
                   icon: Icon(Icons.fitness_center),
@@ -632,7 +646,8 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   void checkObdCompatibility() async {
     while (true) {
-      await Future.delayed(const Duration(milliseconds: 2000));
+      print(11111);
+      await Future.delayed(const Duration(seconds: 2));
       setState(() {
         _isDeviceCompatibleButtonEnabled = false;
       });
@@ -649,9 +664,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
           } catch (e) {
             print(e);
           }
-          // print(model);
-          // print(vin.getManufacturer());
-          // print(vinNumber);
 
           setState(() {
             _isDeviceCompatible = true;

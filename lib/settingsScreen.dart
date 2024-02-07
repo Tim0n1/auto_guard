@@ -29,7 +29,7 @@ class _SettingsPageState extends State<SettingsPage>
   bool isDisposed = false;
   int selectedSize = 0;
   int initialSelectedSize = 2;
-  List<int> sizeOptions = [1, 2, 3, 4, 5, 6, 7, 8];
+  List<int> sizeOptions = [10, 20, 300, 1000];
   List<String> initialSelectedParameters = [];
   List<String> selectedParameters = [];
   List<String> ListOfParameters = StringJson().parametersTitles();
