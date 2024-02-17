@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class MyList extends StatefulWidget {
   final Function(int)? onSelectedModel;
   final Function()? modelsCallback;
+  final Function() isModelListLoading;
   bool isVisible;
   //List<dynamic> models;
   final PostgresService? postgresService;
@@ -12,6 +13,7 @@ class MyList extends StatefulWidget {
       {this.onSelectedModel,
       this.postgresService,
       this.modelsCallback,
+      required this.isModelListLoading,
       required this.isVisible});
 
   @override
@@ -198,29 +200,64 @@ class _MyListState extends State<MyList> {
               child: ListView.separated(
                 shrinkWrap: true,
                 physics: const ClampingScrollPhysics(),
-                itemCount: widget.modelsCallback!().length,
+                itemCount: widget.isModelListLoading()
+                    ? 1
+                    : widget.modelsCallback!().length,
                 separatorBuilder: (BuildContext context, int index) {
                   return const Divider(height: 0, color: Colors.transparent);
                 },
                 itemBuilder: (BuildContext context, int index) {
-                  return ListTile(
-                    title: Text(
-                        '${widget.modelsCallback!()[index][2]}   ${widget.modelsCallback!()[index][3] == widget.modelsCallback!()[index][4] ? '(Full)' : widget.modelsCallback!()[index][3] == 0 ? '(Empty)' : '(${widget.modelsCallback!()[index][3]} / ${widget.modelsCallback!()[index][4]})'}'),
-                    tileColor: _selectedItemIndex == index
-                        ? Colors.deepPurpleAccent.withOpacity(0.3)
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        if (_selectedItemIndex == index) {
-                          _currentModelIndex = _selectedItemIndex;
-                          widget.onSelectedModel!(_selectedItemIndex);
-                          widget.isVisible = false;
-                        } else {
-                          _selectedItemIndex = index;
-                        }
-                      });
-                    },
-                  );
+                  if (widget.isModelListLoading()) {
+                    print('empty');
+                    return SizedBox(
+                      height: MediaQuery.of(context).size.height *
+                          0.3, // Adjust the height as needed
+                      child: const Center(
+                        child:
+                            CircularProgressIndicator(
+                              strokeWidth: 4.5,
+                              
+                            ), // You can replace this with any loading animation widget
+                      ),
+                    );
+                  } else {
+                    bool isTrained = widget.modelsCallback!()[index][
+                        5]; // Assuming the 6th index indicates if trained or not
+                    Color dotColor = isTrained ? Colors.green : Colors.red;
+
+                    return ListTile(
+                      title: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            margin: const EdgeInsets.only(
+                                right: 8), // Adjust the margin as needed
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: dotColor,
+                            ),
+                          ),
+                          Text(
+                              '${widget.modelsCallback!()[index][2]}   ${widget.modelsCallback!()[index][3] == widget.modelsCallback!()[index][4] ? '(Full)' : widget.modelsCallback!()[index][3] == 0 ? '(Empty)' : '(${widget.modelsCallback!()[index][3]} / ${widget.modelsCallback!()[index][4]})'}  -  ${(widget.modelsCallback!()[index][5] == false) ? 'Untrained' : 'Trained'}'),
+                        ],
+                      ),
+                      tileColor: _selectedItemIndex == index
+                          ? Colors.deepPurpleAccent.withOpacity(0.3)
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          if (_selectedItemIndex == index) {
+                            _currentModelIndex = _selectedItemIndex;
+                            widget.onSelectedModel!(_selectedItemIndex);
+                            widget.isVisible = false;
+                          } else {
+                            _selectedItemIndex = index;
+                          }
+                        });
+                      },
+                    );
+                  }
                 },
               ),
             ),

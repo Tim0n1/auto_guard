@@ -32,7 +32,7 @@ class _BlinkingIconState extends State<BlinkingIcon>
                 Icons.car_repair,
                 size: 50,
                 color: widget._isDeviceCompatible
-                    ? Colors.black.withOpacity(0.1)
+                    ? Colors.green.withOpacity(0.5)
                     : Colors.red.withOpacity(0.5),
               ),
     );

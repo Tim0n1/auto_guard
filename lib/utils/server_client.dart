@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String serverAddress = '192.168.1.104';
+const String serverAddress = '192.168.1.103';
 const int serverPort = 5556;
 SharedPreferences? prefs;
 
 class TrainingClient {
   int? userId;
+  int? modelId;
+  SharedPreferences? prefs;
   void getUserId() async {
     prefs = await SharedPreferences.getInstance();
     userId = prefs?.getInt('generatedId');
@@ -17,37 +20,131 @@ class TrainingClient {
     getUserId();
   }
 
-  Future<void> startTraining(int modelId) async {
-    prefs = await SharedPreferences.getInstance();
-    userId = prefs?.getInt('generatedId');
-    // Connect to the server
-    final socket = await Socket.connect(serverAddress, serverPort);
+  Future<bool> startTraining(int modelId) async {
+    Completer<bool> completer =
+        Completer<bool>(); // Completer to handle asynchronous operation
 
-    // Define the message to send
-    final message = {'message': 'train-start $userId $modelId'};
+    try {
+      final Socket socket = await Socket.connect(serverAddress, serverPort);
 
-    // Convert the message to JSON format
-    final messageJson = json.encode(message);
+      final message = {'message': 'train-start $userId $modelId'};
+      final messageJson = json.encode(message);
 
-    // Send the message to the server
-    socket.write(messageJson);
+      socket.write(messageJson);
 
-    // Listen for response from the server
-    socket.listen(
-      (List<int> event) {
-        final response = utf8.decode(event);
-        print('Response from server: $response');
-        socket.close(); // Close the socket after receiving the response
-      },
-      onError: (error) {
-        print('Error: $error');
-        socket.close(); // Close the socket in case of an error
-      },
-      onDone: () {
-        print('Connection closed by server');
-        socket
-            .close(); // Close the socket when the connection is closed by the server
-      },
-    );
+      socket.listen(
+        (List<int> event) {
+          final response = utf8.decode(event);
+          print('Response from server: $response');
+          // Check the response and complete the completer accordingly
+          if (response == '1') {
+            print('svine');
+            completer.complete(true);
+          } else {
+            completer.complete(false);
+          }
+
+          socket.close();
+        },
+        onError: (error) {
+          print('Error: $error');
+          completer.complete(false); // Completing with false in case of error
+          socket.close();
+        },
+        onDone: () {
+          print('Connection closed by server');
+          socket.close();
+        },
+      );
+    } catch (e) {
+      print('Exception: $e');
+      completer.complete(false); // Completing with false in case of exception
+    }
+
+    return completer.future; // Returning the future from the completer
+  }
+
+  Future<bool> stopTraining() async {
+    Completer<bool> completer =
+        Completer<bool>(); // Completer to handle asynchronous operation
+
+    try {
+      final Socket socket = await Socket.connect(serverAddress, serverPort);
+
+      final message = {'message': 'train-stop $userId $modelId'};
+      final messageJson = json.encode(message);
+
+      socket.write(messageJson);
+
+      socket.listen(
+        (List<int> event) {
+          final response = utf8.decode(event);
+          print('Response from server: $response');
+
+          // Check the response and complete the completer accordingly
+          if (response == '1') {
+            completer.complete(true);
+          } else {
+            completer.complete(false);
+          }
+
+          socket.close();
+        },
+        onError: (error) {
+          print('Error: $error');
+          completer.complete(false); // Completing with false in case of error
+          socket.close();
+        },
+        onDone: () {
+          print('Connection closed by server');
+          socket.close();
+        },
+      );
+    } catch (e) {
+      print('Exception: $e');
+      completer.complete(false); // Completing with false in case of exception
+    }
+
+    return completer.future;
+  }
+
+  Future<double> getProgress() async {
+    Completer<double> completer =
+        Completer<double>(); // Completer to handle asynchronous operation
+
+    try {
+      final Socket socket = await Socket.connect(serverAddress, serverPort);
+
+      final message = {'message': 'train-progress $userId $modelId'};
+      final messageJson = json.encode(message);
+
+      socket.write(messageJson);
+
+      socket.listen(
+        (List<int> event) {
+          final response = utf8.decode(event);
+          print('Response from server: $response');
+
+          // Check the response and complete the completer accordingly
+          completer.complete(double.parse(response) / 100);
+
+          socket.close();
+        },
+        onError: (error) {
+          print('Error: $error');
+          completer.complete(0); // Completing with false in case of error
+          socket.close();
+        },
+        onDone: () {
+          print('Connection closed by server');
+          socket.close();
+        },
+      );
+    } catch (e) {
+      print('Exception: $e');
+      completer.complete(0); // Completing with false in case of exception
+    }
+
+    return completer.future;
   }
 }

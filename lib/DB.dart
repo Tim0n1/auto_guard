@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.100';
+String host = '192.168.1.106';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';
@@ -148,15 +148,16 @@ class PostgresService {
       try {
         final models = await _connection?.execute(
             Sql.named('''SELECT * FROM models WHERE user_id = @id'''),
-            parameters: {'id': id}).timeout(Duration(milliseconds: 2000));
+            parameters: {'id': id}).timeout(Duration(milliseconds: 2100));
         if (models?.isEmpty != true) {
           return models;
         } else {
           return [];
         }
-      } catch (e) {
+      } on TimeoutException catch (e) {
         print(e);
-        return [];
+        print('istinsko problemche');
+        return ['r'];
       }
     } else {
       print('Connection is null');
@@ -178,13 +179,15 @@ class PostgresService {
       }
       if (!isAdded) {
         await _connection?.execute(
-            Sql.named('''INSERT INTO models ("user_id", "name", "size", "max_size")
-     VALUES (@id, @name, @size, @max_size )'''),
+            Sql.named(
+                '''INSERT INTO models ("user_id", "name", "size", "max_size", "is_Trained")
+     VALUES (@id, @name, @size, @max_size, @is_Trained)'''),
             parameters: {
               'id': id,
               'name': name,
               'size': size,
               'max_size': maxSize,
+              'is_Trained': false,
             }).timeout(Duration(seconds: 3));
         print('Model added');
         return;

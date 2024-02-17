@@ -78,6 +78,18 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class LoadingPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black.withOpacity(0.5), // Semi-transparent black background
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
 class MainPage extends StatefulWidget {
   @override
   _MainPageState createState() => _MainPageState();
@@ -87,6 +99,18 @@ class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
   StreamController _eventController = StreamController.broadcast();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulating some operations that take time
+    Future.delayed(Duration(seconds: 2), () {
+      setState(() {
+        _isLoading = false;
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -96,57 +120,61 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    //super.build(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Car Doctor $currentVersion'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SettingsPage()),
-              );
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(
+            title: Text('AutoGuard $currentVersion'),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.settings),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => SettingsPage()),
+                  );
+                },
+              ),
+            ],
+          ),
+          body: PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() => _currentIndex = index);
             },
+            children: <Widget>[
+              HomeScreen(controller: _eventController), // Replace with your screen
+              LiveDataPage(
+                  controller: _eventController), // Replace with your screen
+              FaultLogPage(), // Replace with your screen
+              // Add more screens if you have them
+            ],
           ),
-        ],
-      ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() => _currentIndex = index);
-        },
-        children: <Widget>[
-          HomeScreen(controller: _eventController), // Replace with your screen
-          LiveDataPage(
-              controller: _eventController), // Replace with your screen
-          FaultLogPage(), // Replace with your screen
-          // Add more screens if you have them
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (int index) {
-          _pageController.animateToPage(index,
-              duration: Duration(milliseconds: 200), curve: Curves.easeIn);
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (int index) {
+              _pageController.animateToPage(index,
+                  duration: Duration(milliseconds: 200), curve: Curves.easeIn);
+            },
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.auto_graph_sharp),
+                label: 'Live data',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.warning),
+                label: 'Fault log',
+              ),
+              // Add more items if you have them
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.auto_graph_sharp),
-            label: 'Live data',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.warning),
-            label: 'Fault log',
-          ),
-          // Add more items if you have them
-        ],
-      ),
+        ),
+        if (_isLoading) LoadingPage(), // Display loading page if still loading
+      ],
     );
   }
 }

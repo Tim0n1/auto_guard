@@ -15,12 +15,14 @@ class TrainingPage extends StatefulWidget {
   final Function(bool, int)? serviceCallback;
   final Function() statesCallback;
   final Function() modelCallback;
+  final Function(bool, int) trainingCallback;
 
   const TrainingPage(
       {this.postgresService,
       this.serviceCallback,
       required this.statesCallback,
-      required this.modelCallback});
+      required this.modelCallback,
+      required this.trainingCallback});
 
   @override
   _TrainingState createState() => _TrainingState();
@@ -35,17 +37,18 @@ class _TrainingState extends State<TrainingPage> {
   bool _isLoading = false;
   bool _isSnackBarVisible = false;
   bool _isSelectModelVisible = false;
-  double _progressValue = 0.0;
+  double _gatheringProgressValue = 0.0;
+  double _trainingProgressValue = 0.0;
   bool _trainingButtonEnabled = false;
-  bool _secondProgressBarStarted = false;
-  double _secondProgressValue = 0.0;
   int _dataSize = 0;
   int _currentModelSize = 0;
   bool _isInitial = false;
+  bool _isModelListLoading = false;
 
   int _dotAnimationCount = 0;
   late Timer _dotAnimationTimer;
   late Timer _dataGatheringTimer;
+  late Timer _trainingTimer;
   late Timer _refreshModelsTimer;
 
   List<dynamic> models = [];
@@ -63,6 +66,10 @@ class _TrainingState extends State<TrainingPage> {
       _isInitial = true;
       _dataGathering();
     }
+    if (widget.statesCallback()['isTraining']) {
+      _isInitial = true;
+      _training();
+    }
     _startDotAnimation();
     setMaxDataSize();
   }
@@ -71,6 +78,7 @@ class _TrainingState extends State<TrainingPage> {
   void dispose() {
     _isModelRefreshingEnabled = false;
     _dataGatheringTimer.cancel();
+    _trainingTimer.cancel();
     _dotAnimationTimer.cancel();
     _refreshModelsTimer.cancel();
     super.dispose();
@@ -83,6 +91,10 @@ class _TrainingState extends State<TrainingPage> {
 
   List<dynamic> modelsCallback() {
     return models;
+  }
+
+  bool isListLoadingCallback() {
+    return _isModelListLoading;
   }
 
   void handleSelectedModel(int index) {
@@ -103,8 +115,14 @@ class _TrainingState extends State<TrainingPage> {
 
   Future<dynamic> _getModels() async {
     try {
-      models = await widget.postgresService?.getModels();
-      return models;
+      dynamic models1 = await widget.postgresService?.getModels();
+      if (models1[0] == 'r') {
+        _isModelListLoading = true;
+        models1 = [];
+      } else {
+        _isModelListLoading = false;
+      }
+      return models1;
     } catch (e) {
       print(e);
       return [];
@@ -174,6 +192,7 @@ class _TrainingState extends State<TrainingPage> {
         modelId = _selectedModel[0];
       } catch (e) {
         print(e);
+        return;
       }
     } else {
       if (widget.statesCallback()['isInternetEnabled'] == false) {
@@ -221,10 +240,9 @@ class _TrainingState extends State<TrainingPage> {
     setState(() {
       widget.serviceCallback!(true, modelId);
       _isGatheringEnabled = true;
-      _progressValue = 0.0;
-      _trainingButtonEnabled = false; // Disable additional button initially
-      _secondProgressBarStarted = false; // Reset second progress bar
-      _secondProgressValue = 0.0;
+      _gatheringProgressValue = 0.0;
+      _trainingButtonEnabled =
+          false; // Disable additional button initially// Reset second progress bar
     });
 
     setState(() {
@@ -246,15 +264,16 @@ class _TrainingState extends State<TrainingPage> {
             widget.serviceCallback!(_isGatheringEnabled, modelId);
             _isLoading = false;
             _trainingButtonEnabled = true; // Enable additional button
-            _progressValue = 1.0;
+            _gatheringProgressValue = 1.0;
           });
           timer.cancel();
           return;
         }
         setState(() {
-          print('progressValue: $_progressValue');
-          _progressValue = (_currentModelSize.toDouble() / maxSize.toDouble());
-          print(_progressValue);
+          print('progressValue: $_gatheringProgressValue');
+          _gatheringProgressValue =
+              (_currentModelSize.toDouble() / maxSize.toDouble());
+          print(_gatheringProgressValue);
         });
       } catch (e) {
         print(e);
@@ -262,24 +281,89 @@ class _TrainingState extends State<TrainingPage> {
     });
   }
 
-  void _training() {
-    setState(() {
-      _secondProgressBarStarted = true; // Start the second progress bar
-    });
-    TrainingClient client = TrainingClient();
-    client.startTraining(models[_selectedModelIndex][0]);
-    const secondProgressIncrement = 0.02;
-    Timer.periodic(Duration(milliseconds: 50), (timer) {
+  void _training() async {
+    if (_isInitial) {
+      _isInitial = false;
       try {
+        modelId = widget.modelCallback();
+        models = await _getModels();
+        _selectedModel = models.firstWhere((element) => element[0] == modelId);
+        _selectedModelIndex =
+            models.indexWhere((element) => element[0] == modelId);
+        modelId = _selectedModel[0];
         setState(() {
-          _secondProgressValue += secondProgressIncrement;
+          _trainingButtonEnabled = true;
         });
-        if (_secondProgressValue >= 1.0) {
-          timer.cancel();
-          _secondProgressBarStarted = false; // Finish the second progress bar
+      } catch (e) {
+        print(e);
+        return;
+      }
+    } else {
+      if (widget.statesCallback()['isInternetEnabled'] == false) {
+        _showSnackBar('Internet is not enabled');
+        return;
+      } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
+        _showSnackBar('Database is not enabled');
+        return;
+      } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
+        _showSnackBar('Device is not compatible');
+        return;
+      } else if (_selectedModelIndex == -1 || models.isEmpty) {
+        _showSnackBar('No model selected');
+        return;
+      }
+      _selectedModel = models[_selectedModelIndex];
+      modelId = _selectedModel[0];
+    }
+
+    TrainingClient client = TrainingClient();
+
+    if (_isTrainingEnabled) {
+      print('stop training');
+      await client.stopTraining();
+      setState(() {
+        widget.trainingCallback(!_isTrainingEnabled, modelId);
+        _isTrainingEnabled = false;
+      });
+      return;
+    }
+
+    bool trainingStarted = await client.startTraining(modelId);
+    print(trainingStarted);
+    if (trainingStarted) {
+      setState(() {
+        _isTrainingEnabled = true;
+        widget.trainingCallback(_isTrainingEnabled, modelId);
+      });
+    } else {
+      setState(() {
+        _isTrainingEnabled = false;
+      });
+      return;
+    }
+    double progressValue = 0;
+    _trainingTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
+      try {
+        if (_isTrainingEnabled) {
+          print('getting progress');
+          progressValue = await client.getProgress();
+          setState(() {
+            _trainingProgressValue = progressValue;
+          });
+          if (_trainingProgressValue >= 1.0) {
+            print(modelId);
+            setState(() {
+              widget.trainingCallback(!_isTrainingEnabled, modelId);
+              _isTrainingEnabled = false;
+            });
+            timer.cancel();
+            return;
+          }
         }
       } catch (e) {
         print(e);
+        timer.cancel();
+        return;
       }
     });
   }
@@ -295,7 +379,7 @@ class _TrainingState extends State<TrainingPage> {
         Center(
             child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             SizedBox(height: 50),
             Row(
@@ -303,10 +387,7 @@ class _TrainingState extends State<TrainingPage> {
               children: [
                 ElevatedButton.icon(
                   onPressed: () {
-                    if (_secondProgressBarStarted) {
-                      print('second progress bar started');
-                      return;
-                    } else if (_isSnackBarVisible == true) {
+                    if (_isSnackBarVisible == true) {
                       return;
                     } else {
                       print('gathering data');
@@ -331,20 +412,21 @@ class _TrainingState extends State<TrainingPage> {
             ),
             SizedBox(height: 40),
             //_additionalButtonEnabled // Render additional button only if progress is 100%
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: _trainingButtonEnabled ? _training : null,
-              child: Text('Start training'),
+              label: Text(
+                  !_isTrainingEnabled ? 'Start training' : 'Stop Training'),
+              icon: Icon(Icons.play_circle),
             ),
+            // if (_isTrainingEnabled)
+            // ElevatedButton(
+            //   onPressed: _trainingButtonEnabled ? _training : null,
+            //   child: Text('Start training'),
+            // ),
             // : SizedBox(), // Placeholder if the button is not enabled
             SizedBox(height: 20),
-            LinearProgressIndicator(
-              value: _secondProgressValue,
-              minHeight: 10,
-              backgroundColor: const Color.fromARGB(255, 250, 218, 218),
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-            ),
             SizedBox(height: 40),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
                 if (_isSnackBarVisible) {
                   return;
@@ -357,9 +439,12 @@ class _TrainingState extends State<TrainingPage> {
                   _isSelectModelVisible = !_isSelectModelVisible;
                 });
               },
-              child: Text(_isSelectModelVisible
+              label: Text(_isSelectModelVisible
                   ? 'Hide available models'
                   : 'Select model'),
+              icon: !_isSelectModelVisible
+                  ? Icon(Icons.select_all)
+                  : Icon(Icons.hide_source),
             ),
 
             Flexible(
@@ -368,6 +453,7 @@ class _TrainingState extends State<TrainingPage> {
                 visible: _isSelectModelVisible,
                 child: MyList(
                   modelsCallback: modelsCallback,
+                  isModelListLoading: isListLoadingCallback,
                   onSelectedModel: handleSelectedModel,
                   postgresService: widget.postgresService,
                   isVisible: _isSelectModelVisible,
@@ -383,7 +469,9 @@ class _TrainingState extends State<TrainingPage> {
                   child: CircularPercentIndicator(
                     radius: 100.0,
                     lineWidth: 10.0,
-                    percent: _progressValue,
+                    percent: _isTrainingEnabled
+                        ? _trainingProgressValue
+                        : _gatheringProgressValue,
                     header: Text(
                       _isTrainingEnabled
                           ? "Training..."
@@ -403,14 +491,14 @@ class _TrainingState extends State<TrainingPage> {
           ],
         )),
         Positioned(
-          bottom: 8.0,
+          bottom: 3.0,
           right: 12.0,
           child: Text(
-            _selectedModelIndex == -1 || models.isEmpty
+            _selectedModelIndex == -1 || models.isEmpty || models == [0]
                 ? 'No model selected'
                 : (!_isGatheringEnabled
-                    ? 'Selected model: ${models[_selectedModelIndex][2]}\n(${models[_selectedModelIndex][3]})\nMax size: $_dataSize '
-                    : ('Selected model: ${_selectedModel[2]}\n(${_currentModelSize})\nMax size: $maxSize ')),
+                    ? 'Selected model: ${models[_selectedModelIndex][2]}\n(${models[_selectedModelIndex][3]}) ${models[_selectedModelIndex][5] ? "Trained" : "Untrained"}\nMax size: $_dataSize'
+                    : ('Selected model: ${_selectedModel[2]}\n(${_currentModelSize}) ${_selectedModel[5]}\nMax size: $maxSize ')),
             style: TextStyle(
               fontSize: 14.0,
               fontWeight: FontWeight.bold,

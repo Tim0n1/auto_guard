@@ -33,8 +33,13 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   bool get wantKeepAlive => true;
 
   // Callback functions for training page
-  _enableInsertionCallback(bool isEnabled, int modelId) {
+  void _enableInsertionCallback(bool isEnabled, int modelId) {
     _isDBinsertionEnabled = isEnabled;
+    _modelId = modelId;
+  }
+
+  void _isTrainingCallback(bool isTraining, int modelId) {
+    _isTraining = isTraining;
     _modelId = modelId;
   }
 
@@ -51,6 +56,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
       'isDatabaseEnabled': _isDatabaseConnected,
       'isDeviceCompatible': _isDeviceCompatible,
       'isDBinsertionEnabled': _isDBinsertionEnabled,
+      'isTraining': _isTraining
     };
   }
 
@@ -71,6 +77,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   bool _isDeviceCompatible = false;
   bool _isDeviceCompatibleButtonEnabled = true;
   bool _isDBinsertionEnabled = false;
+  bool _isTraining = false;
 
   Map<String, String?> carInformation = {
     "manufacturer": 'Toyota',
@@ -412,11 +419,11 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
             child: Container(
               alignment: Alignment.topCenter,
               padding: const EdgeInsets.only(
-                  top: 20), // Adjust top padding as needed
+                  top: 0), // Adjust top padding as needed
               child: Image.asset(
-                'lib/images/logotobart.png', // Replace with your logo asset path
-                width: 150, // Adjust width as needed
-                height: 150, // Adjust height as needed
+                'lib/images/logoto.png', // Replace with your logo asset path
+                width: 280, // Adjust width as needed
+                height: 220, // Adjust height as needed
               ),
             ),
           ),
@@ -432,13 +439,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                         height: 110, // Adjust height as needed)
                       )
                     : BlinkingIcon(_isDeviceCompatible),
-                //     child: Icon(
-                //   Icons.car_repair,
-                //   size: 50,
-                //   color: _isDeviceCompatible
-                //       ? Colors.black.withOpacity(0.1)
-                //       : Colors.red.withOpacity(0.5),
-                // )
               )),
           Positioned(
             bottom: 150,
@@ -457,6 +457,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                                   statesCallback: _connectionsStateCallback,
                                   serviceCallback: _enableInsertionCallback,
                                   modelCallback: _modelIdCallback,
+                                  trainingCallback: _isTrainingCallback, 
                                 )));
                   },
                   icon: Icon(Icons.fitness_center),
@@ -646,7 +647,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   void checkObdCompatibility() async {
     while (true) {
-      print(11111);
       await Future.delayed(const Duration(seconds: 2));
       setState(() {
         _isDeviceCompatibleButtonEnabled = false;
