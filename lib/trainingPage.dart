@@ -494,7 +494,7 @@ class _TrainingState extends State<TrainingPage> {
           bottom: 3.0,
           right: 12.0,
           child: Text(
-            _selectedModelIndex == -1 || models.isEmpty || models == [0]
+            (_selectedModelIndex == -1 || models.isEmpty) && (!_isGatheringEnabled && !_isTrainingEnabled)
                 ? 'No model selected'
                 : (!_isGatheringEnabled
                     ? 'Selected model: ${models[_selectedModelIndex][2]}\n(${models[_selectedModelIndex][3]}) ${models[_selectedModelIndex][5] ? "Trained" : "Untrained"}\nMax size: $_dataSize'

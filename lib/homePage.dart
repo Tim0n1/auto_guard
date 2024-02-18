@@ -177,8 +177,13 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                 if (_isDatabaseConnected != false) {
                   if (_isDBinsertionEnabled) {
                     print('inserting');
-                    postgresService.insert(
-                        parsedJson.sublist(0, parsedJson.length - 1), _modelId);
+                    try {
+                      postgresService.insert(
+                          parsedJson.sublist(0, parsedJson.length - 1),
+                          _modelId);
+                    } catch (e) {
+                      print('insert problem $e');
+                    }
                   }
                 } else {
                   print('no DB connection');
@@ -418,8 +423,8 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
             right: 0,
             child: Container(
               alignment: Alignment.topCenter,
-              padding: const EdgeInsets.only(
-                  top: 0), // Adjust top padding as needed
+              padding:
+                  const EdgeInsets.only(top: 0), // Adjust top padding as needed
               child: Image.asset(
                 'lib/images/logoto.png', // Replace with your logo asset path
                 width: 280, // Adjust width as needed
@@ -457,7 +462,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                                   statesCallback: _connectionsStateCallback,
                                   serviceCallback: _enableInsertionCallback,
                                   modelCallback: _modelIdCallback,
-                                  trainingCallback: _isTrainingCallback, 
+                                  trainingCallback: _isTrainingCallback,
                                 )));
                   },
                   icon: Icon(Icons.fitness_center),

@@ -105,7 +105,7 @@ class _MainPageState extends State<MainPage> {
   void initState() {
     super.initState();
     // Simulating some operations that take time
-    Future.delayed(Duration(seconds: 2), () {
+    Future.delayed(Duration(seconds: 3), () {
       setState(() {
         _isLoading = false;
       });
