@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String serverAddress = '192.168.1.104';
+const String serverAddress = '192.168.1.101';
 const int serverPort = 5556;
 SharedPreferences? prefs;
 

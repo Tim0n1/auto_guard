@@ -45,6 +45,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   bool _isInternetEnabled = false;
   int? _modelId;
+  List<dynamic> InferenceModel = [];
 
   int? _modelIdCallback() {
     return _modelId;
@@ -480,12 +481,19 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                 ElevatedButton.icon(
                   onPressed: _connectedDevice != null
                       ? () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => BackgroundServiceScreen(
-                                        connectedDevice: _connectedDevice,
-                                      )));
+                          setState(() {
+                            showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return TrainableModels(
+                                    postgresService: postgresService,
+                                    onItemSelected: (String? selectedItem) {
+                                      setState(() {});
+                                      print(selectedItem);
+                                    },
+                                  );
+                                });
+                          });
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -652,39 +660,44 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
   void checkObdCompatibility() async {
     while (true) {
-      await Future.delayed(const Duration(seconds: 2));
-      setState(() {
-        _isDeviceCompatibleButtonEnabled = false;
-      });
-      if (vinNumber.length > 17) {
-        if (await obd2.isListenToDataInitialed) {
-          await Future.delayed(const Duration(milliseconds: 1500));
-          vinNumber = decodeHexASCII3(vinNumber);
-          var vin = VIN(number: vinNumber, extended: true);
-          print(vinNumber);
-          String? model = await vin.getModelAsync();
-          String? manufacturer = vin.getManufacturer();
-          try {
-            carManufacturerLogo = await findImageByName(vin.getManufacturer()!);
-          } catch (e) {
-            print(e);
-          }
+      try {
+        await Future.delayed(const Duration(seconds: 2));
+        setState(() {
+          _isDeviceCompatibleButtonEnabled = false;
+        });
+        if (vinNumber.length > 17) {
+          if (await obd2.isListenToDataInitialed) {
+            await Future.delayed(const Duration(milliseconds: 1500));
+            vinNumber = decodeHexASCII3(vinNumber);
+            var vin = VIN(number: vinNumber, extended: true);
+            print(vinNumber);
+            String? model = await vin.getModelAsync();
+            String? manufacturer = vin.getManufacturer();
+            try {
+              carManufacturerLogo =
+                  await findImageByName(vin.getManufacturer()!);
+            } catch (e) {
+              print(e);
+            }
 
+            setState(() {
+              _isDeviceCompatible = true;
+              carInformation['manufacturer'] = manufacturer;
+              carInformation['model'] = model;
+              //carManufacturerLogo = carManufacturerLogo;
+            });
+          }
+        } else {
           setState(() {
-            _isDeviceCompatible = true;
-            carInformation['manufacturer'] = manufacturer;
-            carInformation['model'] = model;
-            //carManufacturerLogo = carManufacturerLogo;
+            _isDeviceCompatible = false;
           });
         }
-      } else {
         setState(() {
-          _isDeviceCompatible = false;
+          _isDeviceCompatibleButtonEnabled = true;
         });
+      } catch (e) {
+        print(e);
       }
-      setState(() {
-        _isDeviceCompatibleButtonEnabled = true;
-      });
     }
   }
 }
