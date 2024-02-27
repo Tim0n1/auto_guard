@@ -28,8 +28,11 @@ class _SettingsPageState extends State<SettingsPage>
   bool isConnected = false;
   bool isDisposed = false;
   int selectedSize = 0;
+  int selectedThreshold = 0;
   int initialSelectedSize = 2;
+  int initialSelectedThreshold = 50;
   List<int> sizeOptions = [10, 20, 300, 1000];
+  List<int> thresholdOptions = [40, 50, 60, 70, 80, 90];
   List<String> initialSelectedParameters = [];
   List<String> selectedParameters = [];
   List<String> ListOfParameters = StringJson().parametersTitles();
@@ -200,15 +203,17 @@ class _SettingsPageState extends State<SettingsPage>
               onTap: () async {
                 prefs = await SharedPreferences.getInstance();
                 initialSelectedSize = prefs?.getInt('size') ?? 2;
-                print('initialParameter: $initialSelectedParameters');
-                print(initialSelectedSize);
                 _showSizeDialog(initialSelectedSize);
               },
             ),
             ListTile(
               title: const Text('Threshold'),
               trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () {},
+              onTap: () async {
+                prefs = await SharedPreferences.getInstance();
+                initialSelectedThreshold = prefs?.getInt('threshold') ?? 50;
+                _showThresholdDialog(initialSelectedThreshold);
+              },
             ),
 
             const SizedBox(height: 15),
@@ -359,6 +364,62 @@ class _SettingsPageState extends State<SettingsPage>
                     }
                     await prefs?.setInt('size', selectedSize);
                     print('Selected Size: $selectedSize');
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  bool _isThresholdInitialyOpened = true;
+  void _showThresholdDialog(int initialSelectedThreshold) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return AlertDialog(
+              title: Text('Select Threshold'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: thresholdOptions.map((int threshold) {
+                  return RadioListTile<int>(
+                    title: Text('$threshold%'), // Convert int to String
+                    value: threshold,
+                    groupValue: _isThresholdInitialyOpened
+                        ? initialSelectedThreshold
+                        : selectedThreshold,
+                    onChanged: (int? value) {
+                      setState(() {
+                        print(_isThresholdInitialyOpened);
+                        _isThresholdInitialyOpened = false;
+                        selectedThreshold = value!;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    _isThresholdInitialyOpened = true;
+                    selectedThreshold = initialSelectedThreshold;
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    if (prefs == null) {
+                      print('prefs is null');
+                    }
+                    await prefs?.setInt('threshold', selectedThreshold);
+                    print('Selected Size: $selectedThreshold');
                     Navigator.of(context).pop();
                   },
                   child: Text('OK'),

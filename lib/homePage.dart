@@ -20,12 +20,14 @@ import 'DB.dart';
 import 'utils/blinkingIcon.dart';
 import 'utils/findImage.dart';
 import 'utils/trainingPopUpMenu.dart';
+import 'utils/server_client.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({this.controller});
+  const HomeScreen({this.controller1, this.controller2});
   @override
   _HomeState createState() => _HomeState();
-  final StreamController? controller;
+  final StreamController? controller1;
+  final StreamController? controller2;
 }
 
 class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
@@ -73,12 +75,14 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   bool _notificationsPermissionsGranted = false;
 
   PostgresService postgresService = PostgresService();
+  TrainingClient trainingClient = TrainingClient();
 
   bool _serviceRunning = true;
   bool _isDeviceCompatible = false;
   bool _isDeviceCompatibleButtonEnabled = true;
   bool _isDBinsertionEnabled = false;
   bool _isTraining = false;
+  bool _isInferencing = false;
 
   Map<String, String?> carInformation = {
     "manufacturer": 'Toyota',
@@ -91,7 +95,7 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   String currentState = '';
 
   //Stream<void>? _stream;
-  //StreamController _eventController = StreamController.broadcast();
+  //StreamController _eventController1 = StreamController.broadcast();
 
   late Timer _deviceRefreshTimer;
   static const int _refreshInterval = 3; // Refresh interval in seconds
@@ -140,8 +144,53 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
     return id;
   }
 
+  Future<double> inference(List<dynamic> sample) async {
+    prefs = await SharedPreferences.getInstance();
+    int? threshold = prefs?.getInt('threshold');
+    print(threshold);
+    List<dynamic> anomalyScores = [];
+    double anomalyScore;
+    int? voltage;
+    int? rpm;
+    int? speed;
+    int? temp;
+    int? manifoldPressure;
+    for (var i = 0; i < sample.length; i++) {
+      if (sample[i]['response'] == null) {
+        return 0;
+      }
+    }
+    for (var i = 0; i < sample.length; i++) {
+      if (sample[i]['title'] == 'Напрежение на акумулатора') {
+        //voltage = int.parse(parsedJson[i]['response'].split('.')[0]);
+      } else if (sample[i]['title'] == 'Обороти') {
+        rpm = int.parse(sample[i]['response'].split('.')[0]);
+      } else if (sample[i]['title'] == 'Скорост на автомобила') {
+        speed = int.parse(sample[i]['response'].split('.')[0]);
+      } else if (sample[i]['title'] == 'Температура на двигателя') {
+        temp = int.parse(sample[i]['response'].split('.')[0]);
+      } else if (sample[i]['title'] == 'Абсолютно налягане в колектора') {
+        manifoldPressure = int.parse(sample[i]['response'].split('.')[0]);
+      }
+    }
+    anomalyScore =
+        await trainingClient.inference([rpm, speed, temp], InferenceModel[0]);
+
+    print(anomalyScore);
+    print(threshold);
+    if (threshold != null) {
+      print(threshold);
+      if (anomalyScore > threshold) {
+        await postgresService.addFault(InferenceModel[0], anomalyScore);
+      }
+    }
+
+    return anomalyScore;
+  }
+
   Future<void> startParamsExtraction() async {
-    StreamController _eventController = widget.controller!;
+    StreamController _eventController1 = widget.controller1!;
+    StreamController _eventController2 = widget.controller2!;
 
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
@@ -164,16 +213,28 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
 
           print('obd has connection');
           if (!(await obd2.isListenToDataInitialed)) {
-            obd2.setOnDataReceived((command, response, requestCode) {
+            obd2.setOnDataReceived((command, response, requestCode) async {
               try {
-                if (!_eventController.isClosed) {
-                  _eventController.add(response);
+                List<dynamic> parsedJson = [];
+                if (!_eventController1.isClosed) {
+                  if (_isInferencing) {
+                    List<dynamic> anomalyScores;
+                    double anomalyScore = 0;
+                    parsedJson = json.decode(response);
+                    anomalyScore = await inference(
+                        parsedJson.sublist(0, parsedJson.length - 1));
+                    _eventController2.add([1, anomalyScore]);
+                  } else {
+                    _eventController2.add([0]);
+                  }
+                  _eventController1.add(response);
                 } else {
                   print("startirame");
-                  _eventController = StreamController.broadcast();
+                  _eventController1 = StreamController.broadcast();
                 }
-                List<dynamic> parsedJson = [];
-                parsedJson = json.decode(response);
+                if (!_isInferencing) {
+                  parsedJson = json.decode(response);
+                }
                 vinNumber = parsedJson[parsedJson.length - 1]['response'];
                 if (_isDatabaseConnected != false) {
                   if (_isDBinsertionEnabled) {
@@ -487,10 +548,20 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                                 builder: (BuildContext context) {
                                   return TrainableModels(
                                     postgresService: postgresService,
-                                    onItemSelected: (String? selectedItem) {
-                                      setState(() {});
-                                      print(selectedItem);
+                                    onItemSelected:
+                                        (List<dynamic> selectedItem) {
+                                      setState(() {
+                                        InferenceModel = selectedItem;
+                                        if (InferenceModel.isNotEmpty) {
+                                          _isInferencing = true;
+                                        } else {
+                                          _isInferencing = false;
+                                        }
+                                        print(InferenceModel);
+                                      });
                                     },
+                                    model: InferenceModel,
+                                    isInferencing: _isInferencing,
                                   );
                                 });
                           });

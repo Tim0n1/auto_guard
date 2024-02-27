@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String serverAddress = '192.168.1.101';
+const String serverAddress = '192.168.1.105';
 const int serverPort = 5556;
 SharedPreferences? prefs;
 
@@ -18,6 +18,44 @@ class TrainingClient {
 
   TrainingClient() {
     getUserId();
+  }
+
+  Future<double> inference(sample, int modelId) async {
+    Completer<double> completer = Completer<double>();
+    try {
+      final Socket socket = await Socket.connect(serverAddress, serverPort);
+
+      final message = {'message': 'inference $userId $modelId', 'data': sample};
+      final messageJson = json.encode(message);
+
+      socket.write(messageJson);
+
+      socket.listen(
+        (List<int> event) {
+          final response = utf8.decode(event);
+          print('Response from server: $response');
+          // Check the response and complete the completer accordingly
+          double prediction = double.parse(response);
+          completer.complete(prediction);
+
+          socket.close();
+        },
+        onError: (error) {
+          print('Error: $error');
+          completer.complete(0); // Completing with false in case of error
+          socket.close();
+        },
+        onDone: () {
+          print('Connection closed by server');
+          socket.close();
+        },
+      );
+    } catch (e) {
+      print('Exception: $e');
+      completer.complete(0); // Completing with false in case of exception
+    }
+
+    return completer.future; // Returning the future from the completer
   }
 
   Future<bool> startTraining(int modelId) async {
@@ -108,9 +146,9 @@ class TrainingClient {
     return completer.future;
   }
 
-  Future<double> getProgress() async {
-    Completer<double> completer =
-        Completer<double>(); // Completer to handle asynchronous operation
+  Future<bool> getProgress() async {
+    Completer<bool> completer =
+        Completer<bool>(); // Completer to handle asynchronous operation
 
     try {
       final Socket socket = await Socket.connect(serverAddress, serverPort);
@@ -126,13 +164,17 @@ class TrainingClient {
           print('Response from server: $response');
 
           // Check the response and complete the completer accordingly
-          completer.complete(double.parse(response) / 100);
+          if (int.parse(response) == 1) {
+            completer.complete(false);
+          } else {
+            completer.complete(true);
+          }
 
           socket.close();
         },
         onError: (error) {
           print('Error: $error');
-          completer.complete(0); // Completing with false in case of error
+          completer.complete(false); // Completing with false in case of error
           socket.close();
         },
         onDone: () {
@@ -142,7 +184,7 @@ class TrainingClient {
       );
     } catch (e) {
       print('Exception: $e');
-      completer.complete(0); // Completing with false in case of exception
+      completer.complete(false); // Completing with false in case of exception
     }
 
     return completer.future;

@@ -98,7 +98,8 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
-  StreamController _eventController = StreamController.broadcast();
+  StreamController _eventController1 = StreamController.broadcast();
+  StreamController _eventController2 = StreamController.broadcast();
   bool _isLoading = true;
 
   @override
@@ -143,9 +144,9 @@ class _MainPageState extends State<MainPage> {
               setState(() => _currentIndex = index);
             },
             children: <Widget>[
-              HomeScreen(controller: _eventController), // Replace with your screen
+              HomeScreen(controller1: _eventController1, controller2: _eventController2,), // Replace with your screen
               LiveDataPage(
-                  controller: _eventController), // Replace with your screen
+                  controller1: _eventController1, controller2: _eventController2,), // Replace with your screen
               FaultLogPage(), // Replace with your screen
               // Add more screens if you have them
             ],

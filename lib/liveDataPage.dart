@@ -6,13 +6,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 
-
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LiveDataPage extends StatefulWidget {
-  final Stream? stream;
-  final StreamController? controller;
-  const LiveDataPage({this.stream, this.controller});
+  final StreamController? controller1;
+  final StreamController? controller2;
+  const LiveDataPage({this.controller1, this.controller2});
 
   @override
   _LiveDataPageState createState() => _LiveDataPageState();
@@ -22,23 +22,26 @@ class _LiveDataPageState extends State<LiveDataPage>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+  SharedPreferences? prefs;
   List<Map<String, dynamic>> data = [];
-  List<FlSpot> _chartData = [
-  ];
-  StreamController? eventController;
-  StreamSubscription<dynamic>? _streamSubscription;
+  List<FlSpot> _chartData = [];
+  StreamSubscription<dynamic>? _streamSubscription1;
+  StreamSubscription<dynamic>? _streamSubscription2;
+  bool isInferencing = false;
+  bool isInitialInference = true;
   int _counter = 0;
+  int threshold = 0;
 
   @override
   void initState() {
     super.initState();
-    // if (widget.controller!.isClosed){
-    //   widget.controller.
+    // if (widget.controller1!.isClosed){
+    //   widget.controller1.
     // }
-    StreamSubscription<dynamic> _streamSubscription =
-        widget.controller!.stream.listen(
+    StreamSubscription<dynamic> _streamSubscription1 =
+        widget.controller1!.stream.listen(
       (event) {
-        updateData(event);
+        updateParameters(event);
         //print("received data: $event");
       },
       onError: (dynamic error) {
@@ -52,10 +55,37 @@ class _LiveDataPageState extends State<LiveDataPage>
     );
     // Start a periodic timer to update data every 2 seconds
     //Timer.periodic(Duration(seconds: 2), (timer) {
-    //updateData(); // Update the data
+    //updateParameters(); // Update the data
+
+    StreamSubscription<dynamic> _streamSubscription2 =
+        widget.controller2!.stream.listen(
+      (event) {
+        if (event[0] == 1) {
+          if (!isInferencing) {
+            setState(() {
+              _chartData.clear();
+              _counter = 0;
+            });
+          }
+          isInferencing = true;
+          print(event[1]);
+          updatePredictions(event[1]);
+        } else {
+          isInferencing = false;
+        }
+      },
+      onError: (dynamic error) {
+        // Handle errors, if any
+        print('Error occurred: $error');
+      },
+      onDone: () {
+        // Handle when the stream is done (closed)
+        print('StreamController closed');
+      },
+    );
   }
 
-  void updateData(String event) async {
+  void updateParameters(String event) async {
     data = [];
     List<dynamic> parsedJson = [];
     parsedJson = json.decode(event);
@@ -66,19 +96,33 @@ class _LiveDataPageState extends State<LiveDataPage>
           'value': "${parsedJson[i]['response']} ${parsedJson[i]['unit']}"
         });
       }
-      _counter++;
-      _chartData.add(
-          FlSpot(_counter.toDouble(), double.parse(parsedJson[1]['response'])));
-      if (_chartData.length > 20) {
-        _chartData.removeAt(0);
+      if (!isInferencing) {
+        _counter++;
+        _chartData.add(FlSpot(
+            _counter.toDouble(), double.parse(parsedJson[1]['response'])));
+        if (_chartData.length > 20) {
+          _chartData.removeAt(0);
+        }
       }
     });
   }
 
+  void updatePredictions(double data) async {
+    prefs ??= await SharedPreferences.getInstance();
+    setState(() {
+        threshold = prefs!.getInt('threshold')!;
+    });
+    _counter++;
+    _chartData.add(FlSpot(_counter.toDouble(), data));
+    if (_chartData.length > 20) {
+      _chartData.removeAt(0);
+    }
+  }
+
   @override
   void dispose() {
-    _streamSubscription?.cancel();
-    widget.controller!
+    _streamSubscription1?.cancel();
+    widget.controller1!
         .close(); // Close the StreamController when disposing the widget
     super.dispose();
   }
@@ -133,9 +177,16 @@ class _LiveDataPageState extends State<LiveDataPage>
                             sideTitles: SideTitles(showTitles: false)),
                         rightTitles: AxisTitles(
                           sideTitles: SideTitles(
+                            getTitlesWidget: (value, meta) {
+                              if (isInferencing) {
+                                return Text('   ${value.toInt().toString()}%');
+                              } else {
+                                return Text('   ${value.toString()[0]}K');
+                              }
+                            },
                             reservedSize: 50,
                             showTitles: true,
-                            interval: 1000,
+                            interval: isInferencing ? 25 : 1000,
                           ),
                         ),
                         bottomTitles: AxisTitles(
@@ -145,12 +196,13 @@ class _LiveDataPageState extends State<LiveDataPage>
                                 interval: 5,
                                 getTitlesWidget: (value, titleMeta) {
                                   if (value.toInt() % 5 == 0) {
-                                    return Text(value.toInt().toString());
+                                    // ignore: unnecessary_string_interpolations
+                                    return Text('${value.toInt().toString()}');
                                   } else {
                                     return Text('');
                                   }
                                 }))),
-                    maxY: 8000,
+                    maxY: isInferencing ? 100 : 8000,
                     minY: 0,
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
@@ -160,9 +212,26 @@ class _LiveDataPageState extends State<LiveDataPage>
                         color: Colors.black.withAlpha(150),
                         belowBarData: BarAreaData(
                             show: true,
-                            color: Colors.deepPurple.withOpacity(0.3)),
+                            color: isInferencing
+                                ? Colors.red.withOpacity(0.5)
+                                : Colors.deepPurple.withOpacity(0.3)),
                       ),
                     ],
+                    extraLinesData: isInferencing
+                        ? ExtraLinesData(
+                            horizontalLines: [
+                              HorizontalLine(
+                                y: threshold.toDouble(),
+                                color: Colors.red,
+                                strokeWidth: 2,
+                                dashArray: [
+                                  5,
+                                  5
+                                ], // Set dash array for dashed line (optional)
+                              ),
+                            ],
+                          )
+                        : null,
                   ),
                 ),
               ),
@@ -172,8 +241,8 @@ class _LiveDataPageState extends State<LiveDataPage>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Call updateData() to simulate data changes
-          //updateData();
+          // Call updateParameters() to simulate data changes
+          //updateParameters();
         },
         child: Icon(Icons.refresh),
       ),

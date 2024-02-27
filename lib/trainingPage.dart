@@ -1,5 +1,4 @@
 // ignore_for_file: prefer_const_constructors
-import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'utils/server_client.dart';
@@ -62,13 +61,10 @@ class _TrainingState extends State<TrainingPage> {
   void initState() {
     _startRefreshModels();
     super.initState();
-    if (widget.statesCallback()['isDBinsertionEnabled']) {
+    if (widget.statesCallback()['isDBinsertionEnabled'] ||
+        widget.statesCallback()['isTraining']) {
       _isInitial = true;
       _dataGathering();
-    }
-    if (widget.statesCallback()['isTraining']) {
-      _isInitial = true;
-      _training();
     }
     _startDotAnimation();
     setMaxDataSize();
@@ -221,6 +217,9 @@ class _TrainingState extends State<TrainingPage> {
       });
       return;
     }
+    if (_isTrainingEnabled) {
+      _isLoading = false;
+    }
 
     if (_isLoading) {
       return;
@@ -248,25 +247,45 @@ class _TrainingState extends State<TrainingPage> {
     setState(() {
       _isLoading = true;
     });
+    bool trainingFlag = true;
     const progressIncrement = 0.01;
+    TrainingClient client = TrainingClient();
     _dataGatheringTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
       try {
         _currentModelSize = await widget.postgresService?.getModelSize(modelId);
         print('currentSize: $_currentModelSize');
         print('maxSize: $maxSize');
-        if (_isGatheringEnabled == false) {
+        if (_isGatheringEnabled == false && _isTrainingEnabled == false) {
+          print('cancelirame');
           timer.cancel();
           return;
         }
         if (_currentModelSize == maxSize) {
           setState(() {
+            if (trainingFlag) {
+              _isTrainingEnabled = true;
+              client.startTraining(modelId);
+              trainingFlag = false;
+            }
             _isGatheringEnabled = false;
             widget.serviceCallback!(_isGatheringEnabled, modelId);
             _isLoading = false;
             _trainingButtonEnabled = true; // Enable additional button
             _gatheringProgressValue = 1.0;
           });
-          timer.cancel();
+          _isGatheringEnabled = false;
+          if (!_isTrainingEnabled) {
+            setState(() async {
+              _isTrainingEnabled = await client.startTraining(modelId);
+            });
+          } else {
+            _isTrainingEnabled = await client.getProgress();
+
+            if (!_isTrainingEnabled) {
+              timer.cancel();
+            }
+            print(_isTrainingEnabled);
+          }
           return;
         }
         setState(() {
@@ -281,92 +300,92 @@ class _TrainingState extends State<TrainingPage> {
     });
   }
 
-  void _training() async {
-    if (_isInitial) {
-      _isInitial = false;
-      try {
-        modelId = widget.modelCallback();
-        models = await _getModels();
-        _selectedModel = models.firstWhere((element) => element[0] == modelId);
-        _selectedModelIndex =
-            models.indexWhere((element) => element[0] == modelId);
-        modelId = _selectedModel[0];
-        setState(() {
-          _trainingButtonEnabled = true;
-        });
-      } catch (e) {
-        print(e);
-        return;
-      }
-    } else {
-      if (widget.statesCallback()['isInternetEnabled'] == false) {
-        _showSnackBar('Internet is not enabled');
-        return;
-      } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
-        _showSnackBar('Database is not enabled');
-        return;
-      } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
-        _showSnackBar('Device is not compatible');
-        return;
-      } else if (_selectedModelIndex == -1 || models.isEmpty) {
-        _showSnackBar('No model selected');
-        return;
-      }
-      _selectedModel = models[_selectedModelIndex];
-      modelId = _selectedModel[0];
-    }
+  // void _training() async {
+  //   if (_isInitial) {
+  //     _isInitial = false;
+  //     try {
+  //       modelId = widget.modelCallback();
+  //       models = await _getModels();
+  //       _selectedModel = models.firstWhere((element) => element[0] == modelId);
+  //       _selectedModelIndex =
+  //           models.indexWhere((element) => element[0] == modelId);
+  //       modelId = _selectedModel[0];
+  //       setState(() {
+  //         _trainingButtonEnabled = true;
+  //       });
+  //     } catch (e) {
+  //       print(e);
+  //       return;
+  //     }
+  //   } else {
+  //     if (widget.statesCallback()['isInternetEnabled'] == false) {
+  //       _showSnackBar('Internet is not enabled');
+  //       return;
+  //     } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
+  //       _showSnackBar('Database is not enabled');
+  //       return;
+  //     } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
+  //       _showSnackBar('Device is not compatible');
+  //       return;
+  //     } else if (_selectedModelIndex == -1 || models.isEmpty) {
+  //       _showSnackBar('No model selected');
+  //       return;
+  //     }
+  //     _selectedModel = models[_selectedModelIndex];
+  //     modelId = _selectedModel[0];
+  //   }
 
-    TrainingClient client = TrainingClient();
+  //   TrainingClient client = TrainingClient();
 
-    if (_isTrainingEnabled) {
-      print('stop training');
-      await client.stopTraining();
-      setState(() {
-        widget.trainingCallback(!_isTrainingEnabled, modelId);
-        _isTrainingEnabled = false;
-      });
-      return;
-    }
+  //   if (_isTrainingEnabled) {
+  //     print('stop training');
+  //     await client.stopTraining();
+  //     setState(() {
+  //       widget.trainingCallback(!_isTrainingEnabled, modelId);
+  //       _isTrainingEnabled = false;
+  //     });
+  //     return;
+  //   }
 
-    bool trainingStarted = await client.startTraining(modelId);
-    print(trainingStarted);
-    if (trainingStarted) {
-      setState(() {
-        _isTrainingEnabled = true;
-        widget.trainingCallback(_isTrainingEnabled, modelId);
-      });
-    } else {
-      setState(() {
-        _isTrainingEnabled = false;
-      });
-      return;
-    }
-    double progressValue = 0;
-    _trainingTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
-      try {
-        if (_isTrainingEnabled) {
-          print('getting progress');
-          progressValue = await client.getProgress();
-          setState(() {
-            _trainingProgressValue = progressValue;
-          });
-          if (_trainingProgressValue >= 1.0) {
-            print(modelId);
-            setState(() {
-              widget.trainingCallback(!_isTrainingEnabled, modelId);
-              _isTrainingEnabled = false;
-            });
-            timer.cancel();
-            return;
-          }
-        }
-      } catch (e) {
-        print(e);
-        timer.cancel();
-        return;
-      }
-    });
-  }
+  //   bool trainingStarted = await client.startTraining(modelId);
+  //   print(trainingStarted);
+  //   if (trainingStarted) {
+  //     setState(() {
+  //       _isTrainingEnabled = true;
+  //       widget.trainingCallback(_isTrainingEnabled, modelId);
+  //     });
+  //   } else {
+  //     setState(() {
+  //       _isTrainingEnabled = false;
+  //     });
+  //     return;
+  //   }
+  //   double progressValue = 0;
+  //   _trainingTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
+  //     try {
+  //       if (_isTrainingEnabled) {
+  //         print('getting progress');
+  //         progressValue = await client.getProgress();
+  //         setState(() {
+  //           _trainingProgressValue = progressValue;
+  //         });
+  //         if (_trainingProgressValue >= 1.0) {
+  //           print(modelId);
+  //           setState(() {
+  //             widget.trainingCallback(!_isTrainingEnabled, modelId);
+  //             _isTrainingEnabled = false;
+  //           });
+  //           timer.cancel();
+  //           return;
+  //         }
+  //       }
+  //     } catch (e) {
+  //       print(e);
+  //       timer.cancel();
+  //       return;
+  //     }
+  //   });
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -396,7 +415,7 @@ class _TrainingState extends State<TrainingPage> {
                   },
                   label: Text(_isGatheringEnabled
                       ? 'Stop gathering data'
-                      : 'Start gathering data'),
+                      : 'Train model'),
                   icon:
                       Icon(_isGatheringEnabled ? Icons.stop : Icons.play_arrow),
                 ),
@@ -412,20 +431,19 @@ class _TrainingState extends State<TrainingPage> {
             ),
             SizedBox(height: 40),
             //_additionalButtonEnabled // Render additional button only if progress is 100%
-            ElevatedButton.icon(
-              onPressed: _trainingButtonEnabled ? _training : null,
-              label: Text(
-                  !_isTrainingEnabled ? 'Start training' : 'Stop Training'),
-              icon: Icon(Icons.play_circle),
-            ),
+            // ElevatedButton.icon(
+            //   onPressed: _trainingButtonEnabled ? _training : null,
+            //   label: Text(
+            //       !_isTrainingEnabled ? 'Start training' : 'Stop Training'),
+            //   icon: Icon(Icons.play_circle),
+            // ),
             // if (_isTrainingEnabled)
             // ElevatedButton(
             //   onPressed: _trainingButtonEnabled ? _training : null,
             //   child: Text('Start training'),
             // ),
             // : SizedBox(), // Placeholder if the button is not enabled
-            SizedBox(height: 20),
-            SizedBox(height: 40),
+            SizedBox(height: 60),
             ElevatedButton.icon(
               onPressed: () {
                 if (_isSnackBarVisible) {
@@ -460,7 +478,7 @@ class _TrainingState extends State<TrainingPage> {
                 ),
               ),
             ),
-            SizedBox(height: 50),
+            SizedBox(height: 90),
             Visibility(
               visible: !_isSelectModelVisible,
               child: Flexible(
@@ -494,7 +512,8 @@ class _TrainingState extends State<TrainingPage> {
           bottom: 3.0,
           right: 12.0,
           child: Text(
-            (_selectedModelIndex == -1 || models.isEmpty) && (!_isGatheringEnabled && !_isTrainingEnabled)
+            (_selectedModelIndex == -1 || models.isEmpty) &&
+                    (!_isGatheringEnabled && !_isTrainingEnabled)
                 ? 'No model selected'
                 : (!_isGatheringEnabled
                     ? 'Selected model: ${models[_selectedModelIndex][2]}\n(${models[_selectedModelIndex][3]}) ${models[_selectedModelIndex][5] ? "Trained" : "Untrained"}\nMax size: $_dataSize'
