@@ -65,7 +65,7 @@ class _FaultLogPageState extends State<FaultLogPage>
                       padding: EdgeInsets.only(right: 12.0),
                       decoration: new BoxDecoration(
                           border: new Border(right: new BorderSide())),
-                      child: Icon(Icons.delete),
+                      child: Icon(Icons.info),
                     ),
                     title: Text(() {
                       dynamic fault = faults[index];
@@ -90,7 +90,7 @@ class _FaultLogPageState extends State<FaultLogPage>
                         Text(faults[index][2].toString())
                       ],
                     ),
-                    trailing: Icon(Icons.keyboard_arrow_right))),
+                    trailing: Icon(Icons.delete))),
           );
         },
       ),

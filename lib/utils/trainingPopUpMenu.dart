@@ -156,7 +156,8 @@ class _MyListState extends State<MyList> {
 
                       bool isDeleted = false;
                       while (true) {
-                        await Future.delayed(const Duration(milliseconds: 500));
+                        await Future.delayed(
+                            const Duration(milliseconds: 1000));
                         models = widget.modelsCallback!();
                         isDeleted = true;
                         for (var m in models!) {
@@ -165,6 +166,7 @@ class _MyListState extends State<MyList> {
                           }
                         }
                         if (isDeleted) {
+                          print('deleted');
                           break;
                         }
                       }
@@ -208,16 +210,13 @@ class _MyListState extends State<MyList> {
                 },
                 itemBuilder: (BuildContext context, int index) {
                   if (widget.isModelListLoading()) {
-                    print('empty');
                     return SizedBox(
                       height: MediaQuery.of(context).size.height *
                           0.3, // Adjust the height as needed
                       child: const Center(
-                        child:
-                            CircularProgressIndicator(
-                              strokeWidth: 4.5,
-                              
-                            ), // You can replace this with any loading animation widget
+                        child: CircularProgressIndicator(
+                          strokeWidth: 4.5,
+                        ), // You can replace this with any loading animation widget
                       ),
                     );
                   } else {

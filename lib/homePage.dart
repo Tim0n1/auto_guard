@@ -10,7 +10,6 @@ import 'dart:async';
 import 'package:flatur/trainingPage.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'dart:ui';
 import 'settingsScreen.dart';
@@ -103,12 +102,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   int _currentIndex = 0;
 
   Timer? _timer;
-  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-  // this will be used as notification channel id
-  static const notificationChannelId = 'my_foreground';
-// this will be used for notification id, So you can update your custom notification with this id.
-  static const notificationId = 888;
 
   bool isConnected = false; // New variable to track connection status
 
@@ -147,7 +140,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   Future<double> inference(List<dynamic> sample) async {
     prefs = await SharedPreferences.getInstance();
     int? threshold = prefs?.getInt('threshold');
-    print(threshold);
     List<dynamic> anomalyScores = [];
     double anomalyScore;
     int? voltage;
@@ -176,12 +168,11 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
     anomalyScore =
         await trainingClient.inference([rpm, speed, temp], InferenceModel[0]);
 
-    print(anomalyScore);
-    print(threshold);
     if (threshold != null) {
       print(threshold);
       if (anomalyScore > threshold) {
-        await postgresService.addFault(InferenceModel[0], anomalyScore);
+        await postgresService.addFault(
+            InferenceModel[0], anomalyScore, rpm, speed, temp);
       }
     }
 
@@ -250,19 +241,6 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                 } else {
                   print('no DB connection');
                 }
-                flutterLocalNotificationsPlugin.show(
-                  notificationId,
-                  'S',
-                  '${DateTime.now()}',
-                  const NotificationDetails(
-                    android: AndroidNotificationDetails(
-                      notificationChannelId,
-                      'MY FOREGROUND SERVICE',
-                      icon: 'ic_bg_service_small',
-                      ongoing: false,
-                    ),
-                  ),
-                );
               } catch (e) {
                 print(e);
               }

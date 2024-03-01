@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'utils/blinkingIcon.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class TrainingPage extends StatefulWidget {
   final PostgresService? postgresService;
@@ -29,6 +30,11 @@ class TrainingPage extends StatefulWidget {
 
 class _TrainingState extends State<TrainingPage> {
   SharedPreferences? prefs;
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  static const notificationChannelId = 'my_foreground';
+// this will be used for notification id, So you can update your custom notification with this id.
+  static const notificationId = 888;
 
   bool _isGatheringEnabled = false;
   bool _isTrainingEnabled = false;
@@ -207,6 +213,7 @@ class _TrainingState extends State<TrainingPage> {
       _selectedModel = models[_selectedModelIndex];
       modelId = _selectedModel[0];
     }
+    String modelName = _selectedModel[2];
 
     if (_isGatheringEnabled) {
       print('stop gathering data');
@@ -242,6 +249,19 @@ class _TrainingState extends State<TrainingPage> {
       _gatheringProgressValue = 0.0;
       _trainingButtonEnabled =
           false; // Disable additional button initially// Reset second progress bar
+      flutterLocalNotificationsPlugin.show(
+        notificationId,
+        'Started training model: ${modelName}',
+        '${DateTime.now()}',
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            notificationChannelId,
+            'description',
+            icon: 'ic_bg_service_small',
+            ongoing: false,
+          ),
+        ),
+      );
     });
 
     setState(() {
@@ -273,7 +293,6 @@ class _TrainingState extends State<TrainingPage> {
             _trainingButtonEnabled = true; // Enable additional button
             _gatheringProgressValue = 1.0;
           });
-          _isGatheringEnabled = false;
           if (!_isTrainingEnabled) {
             setState(() async {
               _isTrainingEnabled = await client.startTraining(modelId);
@@ -282,9 +301,24 @@ class _TrainingState extends State<TrainingPage> {
             _isTrainingEnabled = await client.getProgress();
 
             if (!_isTrainingEnabled) {
+              var androidNotificationDetails = AndroidNotificationDetails(
+                notificationChannelId,
+                "description",
+                icon: 'ic_bg_service_small',
+                ongoing: false,
+              );
+
+              var notificationDetails = NotificationDetails(
+                android: androidNotificationDetails,
+              );
+              flutterLocalNotificationsPlugin.show(
+                notificationId,
+                "Finished training for model: $modelName",
+                '${DateTime.now()}',
+                notificationDetails,
+              );
               timer.cancel();
             }
-            print(_isTrainingEnabled);
           }
           return;
         }
@@ -292,6 +326,27 @@ class _TrainingState extends State<TrainingPage> {
           print('progressValue: $_gatheringProgressValue');
           _gatheringProgressValue =
               (_currentModelSize.toDouble() / maxSize.toDouble());
+          int progress = (_gatheringProgressValue * 100).toInt();
+          var androidNotificationDetails = AndroidNotificationDetails(
+              notificationChannelId, 'description',
+              icon: 'ic_bg_service_small',
+              ongoing: false,
+              importance: Importance.min,
+              playSound: false,
+              showProgress: true,
+              silent: true,
+              progress: progress,
+              maxProgress: 100,
+              onlyAlertOnce: true,
+              indeterminate: false);
+          var notificationDetails = NotificationDetails(
+            android: androidNotificationDetails,
+          );
+          flutterLocalNotificationsPlugin.show(
+              notificationId,
+              'Started training model: ${modelName}',
+              '${progress.toString()}%',
+              notificationDetails);
           print(_gatheringProgressValue);
         });
       } catch (e) {
@@ -299,93 +354,6 @@ class _TrainingState extends State<TrainingPage> {
       }
     });
   }
-
-  // void _training() async {
-  //   if (_isInitial) {
-  //     _isInitial = false;
-  //     try {
-  //       modelId = widget.modelCallback();
-  //       models = await _getModels();
-  //       _selectedModel = models.firstWhere((element) => element[0] == modelId);
-  //       _selectedModelIndex =
-  //           models.indexWhere((element) => element[0] == modelId);
-  //       modelId = _selectedModel[0];
-  //       setState(() {
-  //         _trainingButtonEnabled = true;
-  //       });
-  //     } catch (e) {
-  //       print(e);
-  //       return;
-  //     }
-  //   } else {
-  //     if (widget.statesCallback()['isInternetEnabled'] == false) {
-  //       _showSnackBar('Internet is not enabled');
-  //       return;
-  //     } else if (widget.statesCallback()['isDatabaseEnabled'] == false) {
-  //       _showSnackBar('Database is not enabled');
-  //       return;
-  //     } else if (widget.statesCallback()['isDeviceCompatible'] == false) {
-  //       _showSnackBar('Device is not compatible');
-  //       return;
-  //     } else if (_selectedModelIndex == -1 || models.isEmpty) {
-  //       _showSnackBar('No model selected');
-  //       return;
-  //     }
-  //     _selectedModel = models[_selectedModelIndex];
-  //     modelId = _selectedModel[0];
-  //   }
-
-  //   TrainingClient client = TrainingClient();
-
-  //   if (_isTrainingEnabled) {
-  //     print('stop training');
-  //     await client.stopTraining();
-  //     setState(() {
-  //       widget.trainingCallback(!_isTrainingEnabled, modelId);
-  //       _isTrainingEnabled = false;
-  //     });
-  //     return;
-  //   }
-
-  //   bool trainingStarted = await client.startTraining(modelId);
-  //   print(trainingStarted);
-  //   if (trainingStarted) {
-  //     setState(() {
-  //       _isTrainingEnabled = true;
-  //       widget.trainingCallback(_isTrainingEnabled, modelId);
-  //     });
-  //   } else {
-  //     setState(() {
-  //       _isTrainingEnabled = false;
-  //     });
-  //     return;
-  //   }
-  //   double progressValue = 0;
-  //   _trainingTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
-  //     try {
-  //       if (_isTrainingEnabled) {
-  //         print('getting progress');
-  //         progressValue = await client.getProgress();
-  //         setState(() {
-  //           _trainingProgressValue = progressValue;
-  //         });
-  //         if (_trainingProgressValue >= 1.0) {
-  //           print(modelId);
-  //           setState(() {
-  //             widget.trainingCallback(!_isTrainingEnabled, modelId);
-  //             _isTrainingEnabled = false;
-  //           });
-  //           timer.cancel();
-  //           return;
-  //         }
-  //       }
-  //     } catch (e) {
-  //       print(e);
-  //       timer.cancel();
-  //       return;
-  //     }
-  //   });
-  // }
 
   @override
   Widget build(BuildContext context) {
@@ -430,19 +398,6 @@ class _TrainingState extends State<TrainingPage> {
               ],
             ),
             SizedBox(height: 40),
-            //_additionalButtonEnabled // Render additional button only if progress is 100%
-            // ElevatedButton.icon(
-            //   onPressed: _trainingButtonEnabled ? _training : null,
-            //   label: Text(
-            //       !_isTrainingEnabled ? 'Start training' : 'Stop Training'),
-            //   icon: Icon(Icons.play_circle),
-            // ),
-            // if (_isTrainingEnabled)
-            // ElevatedButton(
-            //   onPressed: _trainingButtonEnabled ? _training : null,
-            //   child: Text('Start training'),
-            // ),
-            // : SizedBox(), // Placeholder if the button is not enabled
             SizedBox(height: 60),
             ElevatedButton.icon(
               onPressed: () {

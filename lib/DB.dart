@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.103';
+String host = '192.168.1.102';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';
@@ -279,18 +279,31 @@ class PostgresService {
     }
   }
 
-  Future<void> addFault(int modelId, double score,
+  Future<void> addFault(int modelId, double score, int? rpm, int? speed, int? temp,
       {int? anomaly_rpm, int? anomaly_speed, int? anomaly_temp}) async {
     try {
       DateTime now = DateTime.now();
       String now_string = now.toString().split('.')[0];
 
+       final sample_id = await _connection?.execute(
+        Sql.named(
+            '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "Datetime")
+     VALUES (@id,@model_id ,@rpm, @speed, @temp, @datetime) RETURNING "info_id"'''),
+        parameters: {
+          'id': id,
+          'rpm': rpm,
+          'speed': speed,
+          'temp': temp,
+          'datetime': now_string,
+          'model_id': modelId,
+        });
       await _connection?.execute(
           Sql.named(
-              '''INSERT INTO faults ("user_id","model_id","anomaly_rpm", "anomaly_speed", "anomaly_temperature","anomaly", "datetime")
-     VALUES (@id,@model_id ,@anomaly_rpm, @anomaly_speed, @anomaly_temp, @score, @datetime)'''),
+              '''INSERT INTO faults ("user_id","model_id","sample_id","anomaly_rpm", "anomaly_speed", "anomaly_temperature","anomaly", "datetime")
+     VALUES (@id,@model_id, @sample_id ,@anomaly_rpm, @anomaly_speed, @anomaly_temp, @score, @datetime)'''),
           parameters: {
             'id': id,
+            'sample_id': sample_id,
             'anomaly_rpm': anomaly_rpm,
             'anomaly_speed': anomaly_speed,
             'anomaly_temp': anomaly_temp,
@@ -308,10 +321,9 @@ class PostgresService {
     if (_connection != null) {
       final faults = await _connection?.execute(
           Sql.named(
-              '''SELECT faults.fault_id,faults.user_id,models.name,faults.anomaly_rpm, faults.anomaly_speed, faults.anomaly_temperature, faults.anomaly, faults.datetime AS models_name FROM faults LEFT JOIN 
+              '''SELECT faults.fault_id,faults.user_id,models.name,faults.sample_id,faults.anomaly_rpm, faults.anomaly_speed, faults.anomaly_temperature, faults.anomaly, faults.datetime AS models_name FROM faults LEFT JOIN 
                   models ON models.model_id = faults.model_id WHERE faults.user_id = @user_id'''),
           parameters: {'user_id': id}).timeout(Duration(seconds: 3));
-      print(faults);
       return faults;
     } else {
       print('Connection is null!');
