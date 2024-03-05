@@ -372,20 +372,22 @@ class _TrainingState extends State<TrainingPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    if (_isSnackBarVisible == true) {
-                      return;
-                    } else {
-                      print('gathering data');
-                      _dataGathering();
-                    }
-                  },
-                  label: Text(_isGatheringEnabled
-                      ? 'Stop gathering data'
-                      : 'Train model'),
-                  icon:
-                      Icon(_isGatheringEnabled ? Icons.stop : Icons.play_arrow),
+                SizedBox(
+                  width: 210,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (_isSnackBarVisible == true) {
+                        return;
+                      } else {
+                        print('gathering data');
+                        _dataGathering();
+                      }
+                    },
+                    label: Text(
+                        _isGatheringEnabled ? 'Stop  training' : 'Train model'),
+                    icon: Icon(
+                        _isGatheringEnabled ? Icons.stop : Icons.play_arrow),
+                  ),
                 ),
                 if (!_isGatheringEnabled)
                   ElevatedButton.icon(
@@ -419,7 +421,6 @@ class _TrainingState extends State<TrainingPage> {
                   ? Icon(Icons.select_all)
                   : Icon(Icons.hide_source),
             ),
-
             Flexible(
               child: Visibility(
                 maintainState: true,
@@ -439,24 +440,28 @@ class _TrainingState extends State<TrainingPage> {
               child: Flexible(
                 child: Container(
                   alignment: Alignment.center,
-                  child: CircularPercentIndicator(
-                    radius: 100.0,
-                    lineWidth: 10.0,
-                    percent: _isTrainingEnabled
-                        ? _trainingProgressValue
-                        : _gatheringProgressValue,
-                    header: Text(
-                      _isTrainingEnabled
-                          ? "Training..."
-                          : (_isGatheringEnabled
-                              ? "Gathering data${'.' * _dotAnimationCount}"
-                              : ""),
-                      style: TextStyle(fontSize: 18),
+                  child: OverflowBox(
+                    minHeight: 0,
+                    maxHeight: double.infinity,
+                    child: CircularPercentIndicator(
+                      radius: 100.0,
+                      lineWidth: 10.0,
+                      percent: _isTrainingEnabled
+                          ? _trainingProgressValue
+                          : _gatheringProgressValue,
+                      header: Text(
+                        _isTrainingEnabled
+                            ? "Training..."
+                            : (_isGatheringEnabled
+                                ? "Gathering data${'.' * _dotAnimationCount}"
+                                : ""),
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      center: BlinkingIcon(
+                          widget.statesCallback()['isDeviceCompatible']),
+                      backgroundColor: Colors.grey,
+                      progressColor: Colors.deepPurple.withOpacity(0.8),
                     ),
-                    center: BlinkingIcon(
-                        widget.statesCallback()['isDeviceCompatible']),
-                    backgroundColor: Colors.grey,
-                    progressColor: Colors.deepPurple.withOpacity(0.8),
                   ),
                 ),
               ),

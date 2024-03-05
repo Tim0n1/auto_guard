@@ -110,7 +110,11 @@ class _LiveDataPageState extends State<LiveDataPage>
   void updatePredictions(double data) async {
     prefs ??= await SharedPreferences.getInstance();
     setState(() {
+      try {
         threshold = prefs!.getInt('threshold')!;
+      } catch (e) {
+        threshold = 50;
+      }
     });
     _counter++;
     _chartData.add(FlSpot(_counter.toDouble(), data));
