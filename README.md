@@ -12,5 +12,5 @@
 4. За преглед на регистрираните аномалии, преминете на разделът Fault log.
 
 ## License
-GNU GENERAL PUBLIC LICENSE    Version 3, 29 June 2007  
+GNU GENERAL PUBLIC LICENSE   - Version 3, 29 June 2007  
 This project is licensed under the terms of the GNU General Public License (GPL) version 3 or later.
