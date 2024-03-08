@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:postgres/postgres.dart';
 
-String host = '192.168.1.104';
+String host = '192.248.169.154';
 int port = 5432;
 String username = 'postgres';
 String dbName = 'postgres';
@@ -51,24 +51,27 @@ class PostgresService {
 
     int modelSize = await getModelSize(modelId);
     int modelMaxSize = await getModelMaxSize(modelId);
-
-    int? voltage;
-    int? rpm;
-    int? speed;
-    int? temp;
-    int? manifoldPressure;
-    for (var i = 0; i < parsedJson.length; i++) {
-      if (parsedJson[i]['title'] == 'Напрежение на акумулатора') {
-        //voltage = int.parse(parsedJson[i]['response'].split('.')[0]);
-      } else if (parsedJson[i]['title'] == 'Обороти') {
-        rpm = int.parse(parsedJson[i]['response'].split('.')[0]);
-      } else if (parsedJson[i]['title'] == 'Скорост на автомобила') {
-        speed = int.parse(parsedJson[i]['response'].split('.')[0]);
-      } else if (parsedJson[i]['title'] == 'Температура на двигателя') {
-        temp = int.parse(parsedJson[i]['response'].split('.')[0]);
-      } else if (parsedJson[i]['title'] == 'Абсолютно налягане в колектора') {
-        manifoldPressure = int.parse(parsedJson[i]['response'].split('.')[0]);
+      int? voltage;
+      int? rpm;
+      int? speed;
+      int? temp;
+      int? manifoldPressure;
+      try{
+      for (var i = 0; i < parsedJson.length; i++) {
+        if (parsedJson[i]['title'] == 'Напрежение на акумулатора') {
+          //voltage = int.parse(parsedJson[i]['response'].split('.')[0]);
+        } else if (parsedJson[i]['title'] == 'Обороти') {
+          rpm = int.parse(parsedJson[i]['response'].split('.')[0]);
+        } else if (parsedJson[i]['title'] == 'Скорост на автомобила') {
+          speed = int.parse(parsedJson[i]['response'].split('.')[0]);
+        } else if (parsedJson[i]['title'] == 'Температура на двигателя') {
+          temp = int.parse(parsedJson[i]['response'].split('.')[0]);
+        } else if (parsedJson[i]['title'] == 'Абсолютно налягане в колектора') {
+          manifoldPressure = int.parse(parsedJson[i]['response'].split('.')[0]);
+        }
       }
+    } catch (e) {
+      print(e);
     }
     if (rpm == null || speed == null || temp == null) {
       return;
@@ -79,7 +82,7 @@ class PostgresService {
 
     await _connection?.execute(
         Sql.named(
-            '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "Datetime")
+            '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "datetime")
      VALUES (@id,@model_id ,@rpm, @speed, @temp, @datetime)'''),
         parameters: {
           'id': id,
@@ -91,7 +94,7 @@ class PostgresService {
         });
 
     if (modelSize == modelMaxSize) {
-      print('data is successfully inserted');
+    print('data is successfully inserted');
     } else {
       await setModelSize(modelId, modelSize + 1);
     }
@@ -288,7 +291,7 @@ class PostgresService {
 
       final sample_id = await _connection?.execute(
           Sql.named(
-              '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "Datetime")
+              '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "datetime")
      VALUES (@id,@model_id ,@rpm, @speed, @temp, @datetime) RETURNING "info_id"'''),
           parameters: {
             'id': id,
