@@ -182,6 +182,11 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   Future<void> startParamsExtraction() async {
     StreamController _eventController1 = widget.controller1!;
     StreamController _eventController2 = widget.controller2!;
+    List<List<dynamic>> insertionList = [];
+    List<String> timeList = [];
+    int tempUpdate = 0;
+    int modelSize;
+    int maxSize;
 
     final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
@@ -227,19 +232,48 @@ class _HomeState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
                   parsedJson = json.decode(response);
                 }
                 vinNumber = parsedJson[parsedJson.length - 1]['response'];
-                if (_isDatabaseConnected != false) {
-                  if (_isDBinsertionEnabled) {
-                    print('inserting');
-                    try {
-                      postgresService.insert(
-                          parsedJson.sublist(0, parsedJson.length - 1),
-                          _modelId);
-                    } catch (e) {
-                      print('insert problem $e');
+                if (_isDBinsertionEnabled) {
+                  DateTime now = DateTime.now();
+                  String now_string = now.toString().split('.')[0];
+                  timeList.add(now_string);
+                  insertionList
+                      .add(parsedJson.sublist(0, parsedJson.length - 1));
+                  if (_isDatabaseConnected != false && _isDBinsertionEnabled) {
+                    maxSize = await postgresService.getModelMaxSize(_modelId!);
+                    modelSize = await postgresService.getModelSize(_modelId!);
+                    if (modelSize == maxSize) {
+                      print('data is successfully inserted');
+                    } else {
+                      await postgresService.setModelSize(
+                          _modelId!, modelSize + 1);
                     }
+                  } else {
+                    tempUpdate += 1;
                   }
-                } else {
-                  print('no DB connection');
+                  if (insertionList.length >= 8) {
+                    if (_isDatabaseConnected != false) {
+                      if (_isDBinsertionEnabled) {
+                        print('inserting');
+                        try {
+                          postgresService.insert(
+                              insertionList, timeList, _modelId);
+                          insertionList = [];
+                          timeList = [];
+                          if (tempUpdate != 0) {
+                            modelSize =
+                                await postgresService.getModelSize(_modelId!);
+                            await postgresService.setModelSize(
+                                _modelId!, modelSize + tempUpdate);
+                            tempUpdate = 0;
+                          }
+                        } catch (e) {
+                          print('insert problem $e');
+                        }
+                      }
+                    }
+                  } else {
+                    print('no DB connection');
+                  }
                 }
               } catch (e) {
                 print(e);

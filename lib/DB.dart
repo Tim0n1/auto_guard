@@ -39,7 +39,8 @@ class PostgresService {
     print('Connection closed');
   }
 
-  void insert(List<dynamic> parsedJson, int? modelId) async {
+  void insert(List<List<dynamic>> parsedJson, List<String> timeList,
+      int? modelId) async {
     if (_connection == null) {
       print('Cannot insert data. Connection is null');
       return;
@@ -49,55 +50,84 @@ class PostgresService {
       return;
     }
 
-    int modelSize = await getModelSize(modelId);
-    int modelMaxSize = await getModelMaxSize(modelId);
-      int? voltage;
-      int? rpm;
-      int? speed;
-      int? temp;
-      int? manifoldPressure;
-      try{
+    // int modelSize = await getModelSize(modelId);
+    // int modelMaxSize = await getModelMaxSize(modelId);
+    int? voltage;
+    int? rpm;
+    int? speed;
+    int? temp;
+    String datetime;
+    List<List<dynamic>> insertionRows = [];
+    int? manifoldPressure;
+    try {
       for (var i = 0; i < parsedJson.length; i++) {
-        if (parsedJson[i]['title'] == 'Напрежение на акумулатора') {
-          //voltage = int.parse(parsedJson[i]['response'].split('.')[0]);
-        } else if (parsedJson[i]['title'] == 'Обороти') {
-          rpm = int.parse(parsedJson[i]['response'].split('.')[0]);
-        } else if (parsedJson[i]['title'] == 'Скорост на автомобила') {
-          speed = int.parse(parsedJson[i]['response'].split('.')[0]);
-        } else if (parsedJson[i]['title'] == 'Температура на двигателя') {
-          temp = int.parse(parsedJson[i]['response'].split('.')[0]);
-        } else if (parsedJson[i]['title'] == 'Абсолютно налягане в колектора') {
-          manifoldPressure = int.parse(parsedJson[i]['response'].split('.')[0]);
+        for (var j = 0; j < parsedJson[i].length; j++) {
+          if (parsedJson[i][j]['title'] == 'Напрежение на акумулатора') {
+            //voltage = int.parse(parsedJson[i]['response'].split('.')[0]);
+          } else if (parsedJson[i][j]['title'] == 'Обороти') {
+            rpm = int.parse(parsedJson[i][j]['response'].split('.')[0]);
+          } else if (parsedJson[i][j]['title'] == 'Скорост на автомобила') {
+            speed = int.parse(parsedJson[i][j]['response'].split('.')[0]);
+          } else if (parsedJson[i][j]['title'] == 'Температура на двигателя') {
+            temp = int.parse(parsedJson[i][j]['response'].split('.')[0]);
+          } else if (parsedJson[i][j]['title'] ==
+              'Абсолютно налягане в колектора') {
+            manifoldPressure =
+                int.parse(parsedJson[i][j]['response'].split('.')[0]);
+          }
+          if (rpm == null || speed == null || temp == null) {
+            continue;
+          }
         }
+        datetime = timeList[i];
+        print(insertionRows);
+        insertionRows
+            .add([id, modelId, rpm, speed, temp, datetime]);
       }
     } catch (e) {
       print(e);
     }
-    if (rpm == null || speed == null || temp == null) {
-      return;
+
+    String constructValuesQuery(List<List<dynamic>> rows) {
+      final values = rows
+          .map((row) => '(${row.map((value) => '\'$value\'').join(', ')})')
+          .join(', ');
+      return values;
     }
 
-    DateTime now = DateTime.now();
-    String now_string = now.toString().split('.')[0];
+    // DateTime now = DateTime.now();
+    // String now_string = now.toString().split('.')[0];
 
-    await _connection?.execute(
-        Sql.named(
-            '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "datetime")
-     VALUES (@id,@model_id ,@rpm, @speed, @temp, @datetime)'''),
-        parameters: {
-          'id': id,
-          'rpm': rpm,
-          'speed': speed,
-          'temp': temp,
-          'datetime': now_string,
-          'model_id': modelId,
-        });
+    final query =
+        '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "datetime")
+     VALUES ${constructValuesQuery(insertionRows)}''';
+    print(insertionRows);
+    print(query);
 
-    if (modelSize == modelMaxSize) {
-    print('data is successfully inserted');
-    } else {
-      await setModelSize(modelId, modelSize + 1);
+    try {
+      await _connection?.execute(query);
+    } catch (e) {
+      print(e);
     }
+
+    // await _connection?.execute(
+    //     Sql.named(
+    //         '''INSERT INTO params ("user_id","model_id","RPM", "Speed", "Temperature", "datetime")
+    //  VALUES (@id,@model_id ,@rpm, @speed, @temp, @datetime)'''),
+    //     parameters: {
+    //       'id': id,
+    //       'rpm': rpm,
+    //       'speed': speed,
+    //       'temp': temp,
+    //       'datetime': now_string,
+    //       'model_id': modelId,
+    //     });
+
+    // if (modelSize == modelMaxSize) {
+    //   print('data is successfully inserted');
+    // } else {
+    //   await setModelSize(modelId, modelSize + insertionRows.length);
+    // }
   }
 
   Future<void> addUser() async {
